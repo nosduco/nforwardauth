@@ -30,18 +30,21 @@ static AUTHORIZED: &[u8] = b"Authorized";
 thread_local!(static TOKEN_BUCKET: RefCell<HashSet<String>> = RefCell::new(HashSet::new()));
 
 // Initialize token header
-thread_local!(static TOKEN_HEADER: RefCell<Header> = Header::default().into());
+// thread_local!(static TOKEN_HEADER: RefCell<Header> = Header::default().into());
 
 // Initialize token secret
-static TOKEN_SECRET: String = if !env::var_os("TOKEN_SECRET").is_none() { 
-    env::var_os("TOKEN_SECRET").to_str()
-} else {
+static TOKEN_KEY: Hmac<Sha256> = if env::var_os("TOKEN_SECRET").is_none() { 
     // Generate random 30 character long string to act as secret
-    iter::repeat(())
+    let generated_secret: String = iter::repeat(())
         .map(|()| thread_rng().sample(Alphanumeric))
         .map(char::from)
         .take(30)
-        .collect()
+        .collect();
+    // Generate key from randomly generated secret
+    Hmac::new_from_slice(generated_secret.as_bytes()).unwrap()
+} else {
+    // Generate key from environment variable containing custom secret
+    Hmac::new_from_slice(env::var_os("TOKEN_SECRET").to_str()).unwrap()
 };
 
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
