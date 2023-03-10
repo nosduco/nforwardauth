@@ -9,10 +9,11 @@ use hyper::service::service_fn;
 use hyper::{body::Incoming as IncomingBody, Request, Response};
 use hyper::{Method, StatusCode};
 use tokio::net::TcpListener;
-use jsonwebtoken::{encode, Header};
 use std::env;
 use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
+use sha2::Sha256;
+use hmac::{Hmac, Mac};
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 type Result<T> = std::result::Result<T, GenericError>;

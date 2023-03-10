@@ -11,5 +11,7 @@ tokio = { version = "1", features = ["full"] }
 http-body-util = "0.1.0-rc.2" 
 serde_json = "1.0"
 bytes = "1"
-jsonwebtoken = {version = "8", default-features = false }
 rand = "0.8.4"
+jwt = "0.16.0"
+sha2 = "0.10.6"
+hmac = "0.12.1"
