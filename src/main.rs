@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
-use std::collections::HashSet;
-use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::iter;
 use bytes::{Buf, Bytes};
 use http_body_util::{BodyExt, Full};
@@ -14,6 +13,7 @@ use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
 use sha2::Sha256;
 use hmac::{Hmac, Mac};
+use jwt::VerifyWithKey;
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 type Result<T> = std::result::Result<T, GenericError>;
@@ -25,12 +25,6 @@ static INDEX_SCRIPT: &str = "public/script.js";
 static NOT_FOUND: &[u8] = b"Not Found";
 static UNAUTHORIZED: &[u8] = b"Unauthorized";
 static AUTHORIZED: &[u8] = b"Authorized";
-
-// Initialize token bucket
-thread_local!(static TOKEN_BUCKET: RefCell<HashSet<String>> = RefCell::new(HashSet::new()));
-
-// Initialize token header
-// thread_local!(static TOKEN_HEADER: RefCell<Header> = Header::default().into());
 
 // Initialize token secret
 static TOKEN_KEY: Hmac<Sha256> = if env::var_os("TOKEN_SECRET").is_none() { 
@@ -67,23 +61,17 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
 async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // Get token from request headers
     let headers = req.headers();
-    let forward_auth_header = headers[AUTH_HEADER_NAME].to_str().unwrap();
-    // Check if valid cookie exists
-    let mut check_auth = false;
-    TOKEN_BUCKET.with(|token_bucket| {
-        if token_bucket.borrow().contains(forward_auth_header) {
-            // If valid cookie has been found return OK
-            check_auth = true;
-        }
-    });
-    if check_auth {
+    let token_str = headers[AUTH_HEADER_NAME].to_str().unwrap();
+    // Check if valid token exists with correct authentication key
+    let claims: BTreeMap<String, String> = token_str.verify_with_key(&TOKEN_KEY).unwrap();
+    if claims["authenticated"] == "true" {
         return Ok(Response::builder()
            .status(StatusCode::OK)
            .body(full(AUTHORIZED))
            .unwrap());
     }
 
-    // No valid cookie found, return unauthorized
+    // No valid token found, return unauthorized
     Ok(Response::builder()
        .status(StatusCode::UNAUTHORIZED)
        .body(full(UNAUTHORIZED))
