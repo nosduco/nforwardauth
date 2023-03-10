@@ -118,8 +118,6 @@ async fn serve_file(filename: &str) -> Result<Response<BoxBody>> {
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    // Setup secret and token bucket
-    TOKEN_BUCKET = HashSet::new();
     // Create TcpListener and bind to 127.0.0.1:3000
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = TcpListener::bind(addr).await?;
