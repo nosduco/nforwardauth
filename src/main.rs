@@ -8,13 +8,15 @@ use hyper::service::service_fn;
 use hyper::{body::Incoming as IncomingBody, Request, Response};
 use hyper::{Method, StatusCode};
 use tokio::net::TcpListener;
-use cookie::{Cookie, SameSite};
+use jsonwebtoken::{encode, Header};
 use secrets::Secret;
+use std::env;
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 type Result<T> = std::result::Result<T, GenericError>;
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 
+static AUTH_HEADER_NAME: &str = "X-Forward-Auth";
 static INDEX_DOCUMENT: &str = "public/index.html";
 static INDEX_SCRIPT: &str = "public/script.js";
 static NOT_FOUND: &[u8] = b"Not Found";
@@ -22,8 +24,17 @@ static UNAUTHORIZED: &[u8] = b"Unauthorized";
 static AUTHORIZED: &[u8] = b"Authorized";
 
 // Initialize token bucket
-// thread_local!(static TOKEN_BUCKET: HashSet<String>= HashSet::new());
 thread_local!(static TOKEN_BUCKET: RefCell<HashSet<String>> = RefCell::new(HashSet::new()));
+
+// Initialize token header
+thread_local!(static TOKEN_HEADER: RefCell<Header> = Header::default().into());
+
+// Initialize token secret
+static TOKEN_SECRET: String = if !env::var_os("TOKEN_SECRET").is_none() { 
+    env::var_os("TOKEN_SECRET").to_str()
+} else {
+    String::from("random_secret")
+};
 
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
     match (req.method(), req.uri().path()) {
@@ -43,25 +54,22 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
 
 // ForwardAuth route
 async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
-    // Get cookie from request headers
+    // Get token from request headers
     let headers = req.headers();
-    let cookies = headers["cookie"].to_str().unwrap();
+    let forward_auth_header = headers[AUTH_HEADER_NAME].to_str().unwrap();
     // Check if valid cookie exists
-    let mut found = false;
-    for cookie in Cookie::split_parse(cookies) {
-        let cookie = cookie.unwrap();
-        TOKEN_BUCKET.with(|token_bucket| {
-            if token_bucket.borrow().contains(cookie.value()) {
-                // If valid cookie has been found return OK
-                found = true;
-            }
-        });
-        if found {
-            return Ok(Response::builder()
-               .status(StatusCode::OK)
-               .body(full(AUTHORIZED))
-               .unwrap());
+    let mut check_auth = false;
+    TOKEN_BUCKET.with(|token_bucket| {
+        if token_bucket.borrow().contains(forward_auth_header) {
+            // If valid cookie has been found return OK
+            check_auth = true;
         }
+    });
+    if check_auth {
+        return Ok(Response::builder()
+           .status(StatusCode::OK)
+           .body(full(AUTHORIZED))
+           .unwrap());
     }
 
     // No valid cookie found, return unauthorized
@@ -80,17 +88,18 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
 
     // Process login
     if data["username"] == "test" && data["password"] == "test" {
-        // Correct login, respond with OK
-        let jwt = "12hd1928hd28d";
-        // let cookie = format!("{}={}; SameSite={}; {};", "simple-forward-auth", jwt, "Strict", "HttpOnly");
-        let cookie = Cookie::build("simple-forward-auth", jwt)
-            .domain("tux.tonydu.co")
-            .http_only(true)
-            .same_site(SameSite::Strict)
-            .finish();
+        // Correct login, generate token
+        // let token = "12hd1928hd28d";
+        let token = encode(&Header::default(), 
+
+        // Add token to bucket
+        TOKEN_BUCKET.with(|token_bucket| {
+            token_bucket.borrow_mut().insert(token.to_string());
+        });
+        // Return OK with header to be forwarded
         Ok(Response::builder()
            .status(StatusCode::OK)
-           .header(hyper::header::SET_COOKIE, &cookie.to_string())
+           .header(AUTH_HEADER_NAME, token)
            .body(full(AUTHORIZED))
            .unwrap())
     } else {
@@ -118,6 +127,14 @@ async fn serve_file(filename: &str) -> Result<Response<BoxBody>> {
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+
+    // Generate token secret
+    Secret::<[u8; 16]>::random(|s| {
+        TOKEN_SECRET.with(|token_secret| {
+            *token_secret.borrow_mut() = s;
+        });
+    });
+
     // Create TcpListener and bind to 127.0.0.1:3000
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = TcpListener::bind(addr).await?;
