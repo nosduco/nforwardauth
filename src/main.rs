@@ -13,11 +13,17 @@ use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
 use sha2::Sha256;
 use hmac::{Hmac, Mac};
-use jwt::VerifyWithKey;
+use jwt::{SignWithKey, VerifyWithKey};
+use once_cell::sync::OnceCell;
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 type Result<T> = std::result::Result<T, GenericError>;
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
+
+#[derive(Debug)]
+pub struct TokenSecret {
+    key: Hmac<Sha256>
+}
 
 static AUTH_HEADER_NAME: &str = "X-Forward-Auth";
 static INDEX_DOCUMENT: &str = "public/index.html";
@@ -26,20 +32,38 @@ static NOT_FOUND: &[u8] = b"Not Found";
 static UNAUTHORIZED: &[u8] = b"Unauthorized";
 static AUTHORIZED: &[u8] = b"Authorized";
 
-// Initialize token secret
-static TOKEN_KEY: Hmac<Sha256> = if env::var_os("TOKEN_SECRET").is_none() { 
-    // Generate random 30 character long string to act as secret
-    let generated_secret: String = iter::repeat(())
-        .map(|()| thread_rng().sample(Alphanumeric))
-        .map(char::from)
-        .take(30)
-        .collect();
-    // Generate key from randomly generated secret
-    Hmac::new_from_slice(generated_secret.as_bytes()).unwrap()
-} else {
-    // Generate key from environment variable containing custom secret
-    Hmac::new_from_slice(env::var_os("TOKEN_SECRET").to_str()).unwrap()
-};
+static INSTANCE: OnceCell<TokenSecret> = OnceCell::new();
+
+impl TokenSecret {
+    pub fn global() -> &'static TokenSecret {
+        INSTANCE.get().expect("token secret is not initialized")
+    }
+
+    fn initialize() -> Result<TokenSecret> {
+        // Generate key from environment variable or randomly generated secret
+        let key: Hmac<Sha256> = match env::var("TOKEN_SECRET") {
+            Ok(secret) => {
+                // Generate key from environment variable containing custom secret
+                Hmac::new_from_slice(secret.as_bytes()).unwrap()
+            },
+            Err(..) => {
+                // Generate random 30 character long string to act as secret
+                let generated_secret: String = iter::repeat(())
+                    .map(|()| thread_rng().sample(Alphanumeric))
+                    .map(char::from)
+                    .take(30)
+                    .collect();
+                // Generate key from randomly generated secret
+                Hmac::new_from_slice(generated_secret.as_bytes()).unwrap()
+            }
+        };
+
+        // Return token secret instance with generated key
+        Ok(TokenSecret {
+            key
+        })
+    }
+}
 
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
     match (req.method(), req.uri().path()) {
@@ -63,7 +87,7 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
     let headers = req.headers();
     let token_str = headers[AUTH_HEADER_NAME].to_str().unwrap();
     // Check if valid token exists with correct authentication key
-    let claims: BTreeMap<String, String> = token_str.verify_with_key(&TOKEN_KEY).unwrap();
+    let claims: BTreeMap<String, String> = token_str.verify_with_key(&TokenSecret::global().key).unwrap();
     if claims["authenticated"] == "true" {
         return Ok(Response::builder()
            .status(StatusCode::OK)
@@ -87,18 +111,16 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
 
     // Process login
     if data["username"] == "test" && data["password"] == "test" {
-        // Correct login, generate token
-        // let token = "12hd1928hd28d";
-        let token = encode(&Header::default(), 
+        // Correct login, generate claims and token
+        let mut claims = BTreeMap::new();
+        claims.insert("authenticated", "true");
 
-        // Add token to bucket
-        TOKEN_BUCKET.with(|token_bucket| {
-            token_bucket.borrow_mut().insert(token.to_string());
-        });
+        let token_str = claims.sign_with_key(&TokenSecret::global().key).unwrap();
+
         // Return OK with header to be forwarded
         Ok(Response::builder()
            .status(StatusCode::OK)
-           .header(AUTH_HEADER_NAME, token)
+           .header(AUTH_HEADER_NAME, token_str)
            .body(full(AUTHORIZED))
            .unwrap())
     } else {
@@ -126,6 +148,10 @@ async fn serve_file(filename: &str) -> Result<Response<BoxBody>> {
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    // Initialize token secret
+    let token_secret = TokenSecret::initialize().unwrap();
+    INSTANCE.set(token_secret).unwrap();
+
     // Create TcpListener and bind to 127.0.0.1:3000
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = TcpListener::bind(addr).await?;
