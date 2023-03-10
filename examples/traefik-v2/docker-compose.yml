@@ -1,0 +1,26 @@
+version: "3"
+
+services:
+  traefik:
+    image: traefik:v2.9
+    command: --providers.docker
+    ports:
+      - "8000:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  whoami:
+    image: containous/whoami
+    labels:
+      - "traefik.http.routers.whoami.rule=Host(`whoami.localhost.com`)"
+      - "traefik.http.routers.whoami.middlewares=simple-forward-auth"
+  simple-forward-auth:
+    # image: nosduco/simple-forward-auth:v1
+    build: ../../
+    environment:
+      - TOKEN_SECRET=example_secret_123
+      - PORT=3000
+    labels:
+      - "traefik.http.middlewares.simple-forward-auth.forwardauth.address=http://simple-forward-auth:3000"
+      - "traefik.http.middlewares.simple-forward-auth.forwardauth.authResponseHeaders=X-Forward-Auth"
+      - "traefik.http.services.simple-forward-auth.loadbalancer.server.port=3000"
