@@ -26,6 +26,7 @@ pub struct TokenSecret {
 }
 
 static AUTH_HEADER_NAME: &str = "X-Forward-Auth";
+static LOCATION_HEADER_NAME: &str = "Location";
 static INDEX_DOCUMENT: &str = "public/index.html";
 static INDEX_SCRIPT: &str = "public/script.js";
 static NOT_FOUND: &[u8] = b"Not Found";
@@ -66,11 +67,12 @@ impl TokenSecret {
 }
 
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
+    println!("req: {:?}", req);
     match (req.method(), req.uri().path()) {
-        (&Method::GET, "/") | (&Method::GET, "/index.html") => serve_file(INDEX_DOCUMENT).await,
-        (&Method::GET, "/script.js") => serve_file(INDEX_SCRIPT).await,
+        (&Method::GET, "/") | (&Method::GET, "/forward") => api_forward_auth(req).await,
         (&Method::POST, "/login") => api_login(req).await,
-        (&Method::GET, "/forward") => api_forward_auth(req).await,
+        (&Method::GET, "/login") | (&Method::GET, "/index.html") => api_serve_file(INDEX_DOCUMENT).await,
+        (&Method::GET, "/script.js") => api_serve_file(INDEX_SCRIPT).await,
         _ => {
             // 404, not found
             Ok(Response::builder()
@@ -85,19 +87,22 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
 async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // Get token from request headers
     let headers = req.headers();
-    let token_str = headers[AUTH_HEADER_NAME].to_str().unwrap();
-    // Check if valid token exists with correct authentication key
-    let claims: BTreeMap<String, String> = token_str.verify_with_key(&TokenSecret::global().key).unwrap();
-    if claims["authenticated"] == "true" {
-        return Ok(Response::builder()
-           .status(StatusCode::OK)
-           .body(full(AUTHORIZED))
-           .unwrap());
+    if headers.contains_key(AUTH_HEADER_NAME) {
+        let token_str = headers[AUTH_HEADER_NAME].to_str().unwrap();
+        // Check if valid token exists with correct authentication key
+        let claims: BTreeMap<String, String> = token_str.verify_with_key(&TokenSecret::global().key).unwrap();
+        if claims["authenticated"] == "true" {
+            return Ok(Response::builder()
+               .status(StatusCode::OK)
+               .body(full(AUTHORIZED))
+               .unwrap());
+        }
     }
 
-    // No valid token found, return unauthorized
+    // No valid token found, redirect to auth backend
     Ok(Response::builder()
-       .status(StatusCode::UNAUTHORIZED)
+       .status(StatusCode::TEMPORARY_REDIRECT)
+       .header(LOCATION_HEADER_NAME, "/login")
        .body(full(UNAUTHORIZED))
        .unwrap())
 }
@@ -133,7 +138,7 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
 }
 
 // Serve file route
-async fn serve_file(filename: &str) -> Result<Response<BoxBody>> {
+async fn api_serve_file(filename: &str) -> Result<Response<BoxBody>> {
     if let Ok(contents) = tokio::fs::read(filename).await {
         let body = contents.into();
         return Ok(Response::new(Full::new(body).map_err(|never| match never {}).boxed()));
@@ -153,7 +158,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     INSTANCE.set(token_secret).unwrap();
 
     // Create TcpListener and bind to 127.0.0.1:3000
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on http://{}", addr);
 
