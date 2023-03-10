@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::collections::HashSet;
 use std::cell::RefCell;
+use std::iter;
 use bytes::{Buf, Bytes};
 use http_body_util::{BodyExt, Full};
 use hyper::server::conn::http1;
@@ -9,8 +10,9 @@ use hyper::{body::Incoming as IncomingBody, Request, Response};
 use hyper::{Method, StatusCode};
 use tokio::net::TcpListener;
 use jsonwebtoken::{encode, Header};
-use secrets::Secret;
 use std::env;
+use rand::{Rng, thread_rng};
+use rand::distributions::Alphanumeric;
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 type Result<T> = std::result::Result<T, GenericError>;
@@ -33,7 +35,12 @@ thread_local!(static TOKEN_HEADER: RefCell<Header> = Header::default().into());
 static TOKEN_SECRET: String = if !env::var_os("TOKEN_SECRET").is_none() { 
     env::var_os("TOKEN_SECRET").to_str()
 } else {
-    String::from("random_secret")
+    // Generate random 30 character long string to act as secret
+    iter::repeat(())
+        .map(|()| thread_rng().sample(Alphanumeric))
+        .map(char::from)
+        .take(30)
+        .collect()
 };
 
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
@@ -127,14 +134,6 @@ async fn serve_file(filename: &str) -> Result<Response<BoxBody>> {
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-
-    // Generate token secret
-    Secret::<[u8; 16]>::random(|s| {
-        TOKEN_SECRET.with(|token_secret| {
-            *token_secret.borrow_mut() = s;
-        });
-    });
-
     // Create TcpListener and bind to 127.0.0.1:3000
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = TcpListener::bind(addr).await?;

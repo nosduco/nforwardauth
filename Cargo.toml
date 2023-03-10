@@ -12,5 +12,4 @@ http-body-util = "0.1.0-rc.2"
 serde_json = "1.0"
 bytes = "1"
 jsonwebtoken = {version = "8", default-features = false }
-secrets = "1.2.0"
-
+rand = "0.8.4"
