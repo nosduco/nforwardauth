@@ -3,24 +3,32 @@ version: "3"
 services:
   traefik:
     image: traefik:v2.9
-    command: --providers.docker
+    command: --api.insecure=true --providers.docker
     ports:
-      - "8000:80"
+      # HTTP port
+      - "80:80"
+      # Web UI port (enabled by --api.insecure=true)
       - "8080:8080"
     volumes:
+      # Mount docker socket as read-only
       - /var/run/docker.sock:/var/run/docker.sock:ro
+  # Simple whoami container to test functionality (available via Traefik at http://whoami.localhost)
   whoami:
-    image: containous/whoami
+    image: traefik/whoami
     labels:
       - "traefik.http.routers.whoami.rule=Host(`whoami.localhost.com`)"
       - "traefik.http.routers.whoami.middlewares=simple-forward-auth"
+  # simple-forward-auth example configuration
   simple-forward-auth:
     # image: nosduco/simple-forward-auth:v1
     build: ../../
     environment:
       - TOKEN_SECRET=example_secret_123
+      - AUTH_BACKEND_URL=simple-forward-auth.localhost.com
       - PORT=3000
     labels:
+      - "traefik.http.routers.simple-forward-auth.rule=Host(`simple-forward-auth.localhost.com`)"
       - "traefik.http.middlewares.simple-forward-auth.forwardauth.address=http://simple-forward-auth:3000"
-      - "traefik.http.middlewares.simple-forward-auth.forwardauth.authResponseHeaders=X-Forward-Auth"
+      - "traefik.http.middlewares.simple-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-Auth"
+      - "traefik.http.middlewares.simple-forward-auth.forwardauth.trustForwardHeader=true"
       - "traefik.http.services.simple-forward-auth.loadbalancer.server.port=3000"

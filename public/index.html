@@ -4,10 +4,11 @@
     <title>Login</title>
   </head>
   <body>
-    <input type="text" id="username" placeholder="Username" required autofocus>
-    <input type="password" id="password" placeholder="Password" required>
-    <button id="submit">Submit</button>
+    <form method="post" action="/login">
+      <input type="text" id="username" placeholder="Username" required autofocus>
+      <input type="password" id="password" placeholder="Password" required>
+      <input type="submit" id="submit" value="Submit" />
+    </form>
     <button id="test">test</button>
   </body>
-  <script src="/script.js"></script>
 </html>
