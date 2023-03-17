@@ -1,22 +1,50 @@
-// Handle Response Function
-const handleResponse = (res) => {
-  switch (res.status) {
-    case 401:
-      // wrong password
-      alert("Invalid credentials.");
-      break;
-    case 200:
-      alert("good");
-      break;
-    default:
-      break;
-  }
+/* Utility Functions */
+const params = new Proxy(new URLSearchParams(window.location.search), {
+  get: (searchParams, prop) => searchParams.get(prop),
+});
+
+const displayAlert = (msg, variant) => {
+  const alertContainer = document.querySelector(".alert");
+  const alertMessage = document.getElementById("alert-message");
+
+  alertContainer.classList.remove("success", "error");
+  alertContainer.classList.add(variant);
+  alertMessage.innerText = msg;
+  alertContainer.style.display = "block";
+  setTimeout(() => {
+      alertContainer.style.opacity = '1';
+    }, 10);
+}
+
+const handleError = () => {
+  // Unexpected error occurred, show alert
+  displayAlert("Unexpected error occurred.", "error");
 };
 
-// Handle Error Function
-const handleError = (err) => {
-  console.log("Hello");
-  console.err(JSON.stringify(err));
+const handleResponse = (res) => {
+  switch (res.status) {
+    case 200:
+      // Authenticated, redirect to referral (if exists)
+      if (params.r) {
+        console.log("running redirect...");
+        window.location.replace(params.r);
+      } else {
+        // Show alert
+        displayAlert("You have successfully logged in.", "success");
+      }
+      break;
+    case 401:
+      // Bad credentials
+      document.getElementById("password").value = "";
+      displayAlert("Incorrect credentials.", "error");
+      setFieldsDisabled(false);
+      break;
+    default:
+      // Unexpected status code
+      displayAlert("Unexpected response from server.", "error");
+      setFieldsDisabled(false);
+      break;
+  }
 };
 
 // Login function
@@ -36,6 +64,9 @@ const login = () => {
     username,
     password,
   };
+
+  // Disable fields until after request
+  setFieldsDisabled(true);
 
   // Sent HTTP request
   fetch("/login", {
@@ -57,11 +88,3 @@ const setFieldsDisabled = (disabled) => {
 // Configure submit button click to trigger login
 const submitButton = document.getElementById("submit");
 submitButton.onclick = login;
-console.log("Hello");
-
-const testbutton = document.getElementById("test");
-testbutton.onclick = () => {
-  // Sent HTTP request
-  fetch("/forward")
-    .then((res) => console.log(res));
-};

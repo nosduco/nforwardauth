@@ -8,6 +8,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{body::Incoming as IncomingBody, Request, Response};
 use hyper::{Method, StatusCode};
+use hyper::header::{LOCATION, COOKIE, SET_COOKIE, CONTENT_TYPE};
 use tokio::net::TcpListener;
 use std::env;
 use rand::{Rng, thread_rng};
@@ -21,19 +22,16 @@ use crate::util::{full, Result, BoxBody};
 use crate::config::Config;
 use http_body_util::BodyExt;
 use bytes::Buf;
-// use url::Url;
-
-
+use url::Url;
+use mime_guess;
 
 /* Header Names */
-static FORWARD_HOST_HEADER: &str = "X-Forwarded-Host";
-static FORWARD_AUTH_HEADER: &str = "X-Forwarded-Auth";
-static FORWARD_USER_HEADER: &str = "X-Forwarded-User";
-static LOCATION_HEADER: &str = "Location";
+static FORWARDED_HOST: &str = "X-Forwarded-Host";
+static FORWARDED_PROTO: &str = "X-Forwarded-Proto";
+static FORWARDED_URI: &str = "X-Forwarded-Uri";
 
 /* Static Fiiles */
 static INDEX_DOCUMENT: &str = "public/index.html";
-static INDEX_SCRIPT: &str = "public/script.js";
 
 /* HTTP Status Responses */
 static NOT_FOUND: &[u8] = b"Not Found";
@@ -97,15 +95,17 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") | (&Method::GET, "/forward") => api_forward_auth(req).await,
         (&Method::POST, "/login") => api_login(req).await,
-        (&Method::GET, "/login") | (&Method::GET, "/index.html") => api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await,
-        (&Method::GET, "/script.js") => api_serve_file(INDEX_SCRIPT, StatusCode::OK).await,
-        _ => {
+        (&Method::GET, "/login") => api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await,
+        // (&Method::GET, "/login") | (&Method::GET, "/index.html") => api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await,
+        _ => api_serve_file(format!("public{}", req.uri().path()).as_str(), StatusCode::OK).await,
+        // {
+            
             // 404, not found
-            Ok(Response::builder()
-               .status(StatusCode::NOT_FOUND)
-               .body(full(NOT_FOUND))
-               .unwrap())
-        }
+            // Ok(Response::builder()
+            //    .status(StatusCode::NOT_FOUND)
+            //    .body(full(NOT_FOUND))
+            //    .unwrap())
+        // }
     }
 }
 
@@ -113,10 +113,9 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
 async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // Get token from request headers
     let headers = req.headers();
-    if headers.contains_key(hyper::header::COOKIE) {
+    if headers.contains_key(COOKIE) {
         // Grab cookies from headers
-        let cookies = headers[hyper::header::COOKIE].to_str().unwrap();
-
+        let cookies = headers[COOKIE].to_str().unwrap();
         // Find jwt cookie (if exists)
         for cookie in Cookie::split_parse(cookies) {
             let cookie = cookie.unwrap();
@@ -135,9 +134,24 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
         }
     }
 
-    // No valid cookie/jwt found, redirect to login page
+    // No valid cookie/jwt found, create redirect url and return
+    let mut location = Url::parse(format!("http://{}/login", &Config::global().auth_backend_url).as_str())?;
+
+    if headers.contains_key(FORWARDED_HOST) && headers[FORWARDED_HOST].to_str().unwrap() != &Config::global().auth_backend_url {
+        let mut referral_url = Url::parse(format!("http://{}", headers[FORWARDED_HOST].to_str().unwrap()).as_str())?;
+        if headers.contains_key(FORWARDED_PROTO) {
+            if let Err(_e) = referral_url.set_scheme(headers[FORWARDED_PROTO].to_str().unwrap()) {
+                println!("Error setting protocol for referral url.");
+            }
+        }
+        if headers.contains_key(FORWARDED_URI) {
+            referral_url.set_path(headers[FORWARDED_URI].to_str().unwrap());
+        }
+        location.set_query(Some(format!("r={}", referral_url.to_string()).as_str())); 
+    }
+
     return Ok(Response::builder().status(StatusCode::TEMPORARY_REDIRECT)
-              .header(LOCATION_HEADER, format!("http://{}/login", &Config::global().auth_backend_url))
+              .header(LOCATION, location.to_string())
               .body(full(UNAUTHORIZED))
               .unwrap());
 }
@@ -155,7 +169,6 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         claims.insert("authenticated", "true");
         let cookie = Cookie::build("simple-forward-auth-jwt", claims.sign_with_key(&Config::global().key).unwrap())
             .domain("localhost.com")
-            .secure(true)
             .http_only(true)
             .same_site(SameSite::Strict)
             .finish();
@@ -163,7 +176,7 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         // Return OK with cookie
         Ok(Response::builder()
            .status(StatusCode::OK)
-           .header(hyper::header::SET_COOKIE, cookie.to_string())
+           .header(SET_COOKIE, cookie.to_string())
            .body(full(AUTHORIZED))
            .unwrap())
     } else {
@@ -178,6 +191,16 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
 // Serve file route
 async fn api_serve_file(filename: &str, status_code: StatusCode) -> Result<Response<BoxBody>> {
     if let Ok(contents) = tokio::fs::read(filename).await {
+        // Get mimetype of file
+        let mimetype = mime_guess::from_path(filename);
+        if !mimetype.is_empty() {
+            return Ok(Response::builder()
+               .header(CONTENT_TYPE, mimetype.first().unwrap().to_string())
+               .status(status_code)
+               .body(full(contents))
+               .unwrap());
+        }
+
         return Ok(Response::builder()
            .status(status_code)
            .body(full(contents))

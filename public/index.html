@@ -1,14 +1,31 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
-    <title>Login</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unauthorized</title>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
   </head>
   <body>
-    <form method="post" action="/login">
-      <input type="text" id="username" placeholder="Username" required autofocus>
-      <input type="password" id="password" placeholder="Password" required>
-      <input type="submit" id="submit" value="Submit" />
-    </form>
-    <button id="test">test</button>
+    <div class="container">
+      <div class="form">
+        <div class="alert">
+          <p id="alert-message"></p>
+        </div>
+        <h1>Login</h1>
+        <div class="form-control">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required autofocus>
+        </div>
+        <div class="form-control">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required>
+        </div>
+        <div class="button-container">
+          <button id="submit">Submit</button>
+        </div>
+      </div>
   </body>
+  <script src="/script.js"></script>
 </html>

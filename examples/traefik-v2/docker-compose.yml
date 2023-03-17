@@ -29,6 +29,6 @@ services:
     labels:
       - "traefik.http.routers.simple-forward-auth.rule=Host(`simple-forward-auth.localhost.com`)"
       - "traefik.http.middlewares.simple-forward-auth.forwardauth.address=http://simple-forward-auth:3000"
-      - "traefik.http.middlewares.simple-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-Auth"
-      - "traefik.http.middlewares.simple-forward-auth.forwardauth.trustForwardHeader=true"
+      # - "traefik.http.middlewares.simple-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-Auth"
+      # - "traefik.http.middlewares.simple-forward-auth.forwardauth.trustForwardHeader=true"
       - "traefik.http.services.simple-forward-auth.loadbalancer.server.port=3000"

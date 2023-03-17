@@ -1,0 +1,104 @@
+body {
+  font-family: 'Open Sans', sans-serif;
+  background-color: #f1f1f1;
+}
+
+.container {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.form {
+  background-color: #fff;
+  padding: 2em;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+  font-size: 2.5em;
+  text-align: center;
+  margin-bottom: 1em;
+}
+
+.form-control {
+  margin-bottom: 1em;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5em;
+}
+
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  padding: 0.8em;
+  border: none;
+  background-color: #f2f2f2;
+  border-radius: 5px;
+  font-size: 1.1em;
+  box-sizing: border-box;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus {
+  outline: none;
+  background-color: #e8e8e8;
+}
+
+button {
+  width: 100%;
+  padding: 1em;
+  border: none;
+  border-radius: 5px;
+  font-size: 1.1em;
+  background-color: #fda50f;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+button:hover {
+  background-color: #ffbd2f;
+}
+
+button:focus {
+  outline: none;
+}
+
+.button-container {
+  margin-top: 1em;
+}
+
+.alert {
+  display: none;
+  /* margin: 20px 0; */
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 18px;
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.alert.success {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.alert.error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
