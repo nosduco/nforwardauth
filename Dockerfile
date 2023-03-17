@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/src/app/target \
     cargo build --release && \
     cargo strip && \
-    mv /usr/src/app/target/release/simple-forward-auth /usr/src/app
+    mv /usr/src/app/target/release/nforwardauth /usr/src/app
 
 # STAGE: Minify
 FROM node:19.8.1 as minifier
@@ -46,7 +46,7 @@ FROM debian:buster-slim
 WORKDIR /app
 
 # Copy binary from build stage
-COPY --from=builder /usr/src/app/simple-forward-auth /app/simple-forward-auth
+COPY --from=builder /usr/src/app/nforwardauth /app/nforwardauth
 
 # Copy files and assets to serve (overwritable via docker volume mount)
 COPY ./public /app/public
@@ -55,4 +55,4 @@ COPY --from=minifier /app/script.js /app/public/script.js
 COPY --from=minifier /app/index.html /app/public/index.html
 
 # Set entrypoint for image
-ENTRYPOINT ["./simple-forward-auth"]
+ENTRYPOINT ["./nforwardauth"]

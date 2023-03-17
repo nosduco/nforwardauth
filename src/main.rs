@@ -39,6 +39,9 @@ static NOT_FOUND: &[u8] = b"Not Found";
 static UNAUTHORIZED: &[u8] = b"Unauthorized";
 static AUTHORIZED: &[u8] = b"Authorized";
 
+/* Cookie Keys */
+static COOKIE_KEY: &str = "nforwardauth";
+
 /* Config Singleton Instance */
 static INSTANCE: OnceCell<Config> = OnceCell::new();
 
@@ -121,7 +124,7 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
         for cookie in Cookie::split_parse(cookies) {
             let cookie = cookie.unwrap();
 
-            if cookie.name() == "simple-forward-auth-jwt" {
+            if cookie.name() == COOKIE_KEY {
                 // Found cookie, parse token and validate
                 let token_str = cookie.value();
                 let claims: BTreeMap<String, String> = token_str.verify_with_key(&Config::global().key).unwrap();
@@ -172,7 +175,7 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         now += Duration::days(7);
         let cookie_domain = Url::parse(format!("http://{}", &Config::global().auth_backend_url).as_str())?.domain().unwrap().to_string();
         println!("cookie domain: {}", cookie_domain);
-        let cookie = Cookie::build("simple-forward-auth-jwt", claims.sign_with_key(&Config::global().key).unwrap())
+        let cookie = Cookie::build(COOKIE_KEY, claims.sign_with_key(&Config::global().key).unwrap())
             .domain(cookie_domain)
             .http_only(true)
             .same_site(SameSite::Strict)

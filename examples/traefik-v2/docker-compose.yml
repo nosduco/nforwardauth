@@ -17,16 +17,16 @@ services:
     image: traefik/whoami
     labels:
       - "traefik.http.routers.whoami.rule=Host(`whoami.localhost.com`)"
-      - "traefik.http.routers.whoami.middlewares=simple-forward-auth"
-  # simple-forward-auth example configuration
-  simple-forward-auth:
-    # image: nosduco/simple-forward-auth:v1
+      - "traefik.http.routers.whoami.middlewares=nforwardauth"
+  # nforwardauth example configuration
+  nforwardauth:
+    # image: nosduco/nforwardauth:v1
     build: ../../
     environment:
       - TOKEN_SECRET=example_secret_123
-      - AUTH_BACKEND_URL=simple-forward-auth.localhost.com
+      - AUTH_BACKEND_URL=nforwardauth.localhost.com
       - PORT=3000
     labels:
-      - "traefik.http.routers.simple-forward-auth.rule=Host(`simple-forward-auth.localhost.com`)"
-      - "traefik.http.middlewares.simple-forward-auth.forwardauth.address=http://simple-forward-auth:3000"
-      - "traefik.http.services.simple-forward-auth.loadbalancer.server.port=3000"
+      - "traefik.http.routers.nforwardauth.rule=Host(`nforwardauth.localhost.com`)"
+      - "traefik.http.middlewares.nforwardauth.forwardauth.address=http://nforwardauth:3000"
+      - "traefik.http.services.nforwardauth.loadbalancer.server.port=3000"
