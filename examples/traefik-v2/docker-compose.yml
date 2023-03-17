@@ -12,7 +12,7 @@ services:
     volumes:
       # Mount docker socket as read-only
       - /var/run/docker.sock:/var/run/docker.sock:ro
-  # Simple whoami container to test functionality (available via Traefik at http://whoami.localhost)
+  # Simple whoami container to test functionality (available via Traefik at http://whoami.localhost.com with /etc/host edits)
   whoami:
     image: traefik/whoami
     labels:
@@ -29,6 +29,4 @@ services:
     labels:
       - "traefik.http.routers.simple-forward-auth.rule=Host(`simple-forward-auth.localhost.com`)"
       - "traefik.http.middlewares.simple-forward-auth.forwardauth.address=http://simple-forward-auth:3000"
-      # - "traefik.http.middlewares.simple-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-Auth"
-      # - "traefik.http.middlewares.simple-forward-auth.forwardauth.trustForwardHeader=true"
       - "traefik.http.services.simple-forward-auth.loadbalancer.server.port=3000"

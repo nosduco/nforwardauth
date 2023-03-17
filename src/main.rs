@@ -16,7 +16,7 @@ use rand::distributions::Alphanumeric;
 use sha2::Sha256;
 use hmac::{Hmac, Mac};
 use jwt::{SignWithKey, VerifyWithKey};
-use cookie::{Cookie, SameSite, Expiration};
+use cookie::{Cookie, SameSite};
 use cookie::time::{Duration, OffsetDateTime};
 use once_cell::sync::OnceCell;
 use crate::util::{full, Result, BoxBody};
@@ -170,8 +170,10 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         claims.insert("authenticated", "true");
         let mut now = OffsetDateTime::now_utc();
         now += Duration::days(7);
+        let cookie_domain = Url::parse(format!("http://{}", &Config::global().auth_backend_url).as_str())?.domain().unwrap().to_string();
+        println!("cookie domain: {}", cookie_domain);
         let cookie = Cookie::build("simple-forward-auth-jwt", claims.sign_with_key(&Config::global().key).unwrap())
-            .domain("localhost.com")
+            .domain(cookie_domain)
             .http_only(true)
             .same_site(SameSite::Strict)
             .expires(now)
