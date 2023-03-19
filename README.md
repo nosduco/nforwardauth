@@ -4,7 +4,9 @@ nforwardauth is a simple and minimalist forward auth service that lets you use a
 
 <details>
   <summary>Screenshots</summary>
-  ### TODO: Add screenshots
+
+  ![Screenshot](https://github.com/nosduco/nforwardauth/blob/main/screenshot.png)
+
 </details>
 
 ## Why nforwardauth?
@@ -135,6 +137,7 @@ Look at the `examples` directory in the repository or the below details section 
 Here are some current todo's for the project:
 
 - Find and fix bugs
+- Add CRSF token/cookie for protection
 - Better documentation and examples
 - Add built-in themes for login page
 - Documentation on how to write your own login page and mount at `/public` on the container
@@ -149,5 +152,5 @@ If you find a bug or have a suggestion for how to improve nforwardauth or additi
 
 ## License
 
-nforwardauth is released under the MIT License. Please see the [LICENSE](https://giuthub.com/nosduco/nforwardauth/blob/main/LICENSE.md) file for details.
+nforwardauth is released under the mit license. please see the [license](https://giuthub.com/nosduco/nforwardauth/blob/main/license.md) file for details.
 
