@@ -1,5 +1,7 @@
 # nforwardauth
 
+[![Actions status](https://github.com/nosduco/nforwardauth/workflows/CI/badge.svg)](https://github.com/nosduco/nforwardauth/actions)
+
 nforwardauth is a simple and minimalist forward auth service that lets you use a single authentication middleware for all your sites (intended for use with [Traefik](https://github.com/traefik/traefik)).
 
 <details>
