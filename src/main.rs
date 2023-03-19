@@ -16,13 +16,10 @@ use hyper::{Method, StatusCode};
 use jwt::{SignWithKey, VerifyWithKey};
 use mime_guess;
 use once_cell::sync::OnceCell;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
 use regex::Regex;
 use sha2::Sha256;
 use std::collections::BTreeMap;
 use std::env;
-use std::iter;
 use std::net::SocketAddr;
 use tokio::fs;
 use tokio::net::TcpListener;
@@ -63,14 +60,8 @@ impl Config {
                 Hmac::new_from_slice(secret.as_bytes()).unwrap()
             }
             Err(..) => {
-                // Generate random 30 character long string to act as secret
-                let generated_secret: String = iter::repeat(())
-                    .map(|()| thread_rng().sample(Alphanumeric))
-                    .map(char::from)
-                    .take(30)
-                    .collect();
-                // Generate key from randomly generated secret
-                Hmac::new_from_slice(generated_secret.as_bytes()).unwrap()
+                println!("Error: missing TOKEN_SECRET environment variable");
+                std::process::exit(78);
             }
         };
 
