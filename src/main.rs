@@ -14,7 +14,6 @@ use hyper::service::service_fn;
 use hyper::{body::Incoming as IncomingBody, Request, Response};
 use hyper::{Method, StatusCode};
 use jwt::{SignWithKey, VerifyWithKey};
-use mime_guess;
 use once_cell::sync::OnceCell;
 use regex::Regex;
 use sha2::Sha256;
@@ -86,7 +85,7 @@ impl Config {
         let cookie_domain: String = match env::var("COOKIE_DOMAIN") {
             Ok(value) => value,
             Err(..) => {
-                if host.is_some() {
+                if let Some(..) = host {
                     host.unwrap()
                         .get(0)
                         .map_or(auth_host.clone().as_str(), |m| m.as_str())
@@ -162,7 +161,7 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
         Url::parse(format!("http://{}/login", &Config::global().auth_host).as_str())?;
 
     if headers.contains_key(FORWARDED_HOST)
-        && headers[FORWARDED_HOST].to_str().unwrap() != &Config::global().auth_host
+        && headers[FORWARDED_HOST].to_str().unwrap() != Config::global().auth_host
     {
         let mut referral_url =
             Url::parse(format!("http://{}", headers[FORWARDED_HOST].to_str().unwrap()).as_str())?;
@@ -174,14 +173,14 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
         if headers.contains_key(FORWARDED_URI) {
             referral_url.set_path(headers[FORWARDED_URI].to_str().unwrap());
         }
-        location.set_query(Some(format!("r={}", referral_url.to_string()).as_str()));
+        location.set_query(Some(format!("r={}", referral_url).as_str()));
     }
 
-    return Ok(Response::builder()
+    Ok(Response::builder()
         .status(StatusCode::TEMPORARY_REDIRECT)
         .header(LOCATION, location.to_string())
         .body(full(UNAUTHORIZED))
-        .unwrap());
+        .unwrap())
 }
 
 // Login route
@@ -226,10 +225,10 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     }
 
     // Incorrect login, respond with unauthorized
-    return Ok(Response::builder()
+    Ok(Response::builder()
         .status(StatusCode::UNAUTHORIZED)
         .body(full(UNAUTHORIZED))
-        .unwrap());
+        .unwrap())
 }
 
 // Serve file route
@@ -268,7 +267,7 @@ async fn get_user_hash(user: &str) -> Result<Option<String>> {
             return Ok(Some(captures.get(2).map_or("", |m| m.as_str()).to_string()));
         }
     }
-    return Ok(None);
+    Ok(None)
 }
 
 #[tokio::main]

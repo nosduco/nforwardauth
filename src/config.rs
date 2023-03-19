@@ -1,5 +1,5 @@
-use sha2::Sha256;
 use hmac::Hmac;
+use sha2::Sha256;
 
 #[derive(Debug)]
 pub struct Config {
