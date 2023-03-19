@@ -1,32 +1,33 @@
 version: "3"
 
 services:
-  traefik:
+  traefik: # Basic traefik v2 configuration
     image: traefik:v2.9
     command: --api.insecure=true --providers.docker
     ports:
-      # HTTP port
-      - "80:80"
-      # Web UI port (enabled by --api.insecure=true)
-      - "8080:8080"
+      - "80:80" # HTTP port
+      - "8080:8080" # Web UI port (enabled by --api.insecure=true)
     volumes:
       # Mount docker socket as read-only
       - /var/run/docker.sock:/var/run/docker.sock:ro
-  # Simple whoami container to test functionality (available via Traefik at http://whoami.localhost.com with /etc/host edits)
-  whoami:
+  whoami: # Simple whoami container to test functionality (available via Traefik at http://whoami.localhost.com)
     image: traefik/whoami
     labels:
       - "traefik.http.routers.whoami.rule=Host(`whoami.localhost.com`)"
       - "traefik.http.routers.whoami.middlewares=nforwardauth"
-  # nforwardauth example configuration
-  nforwardauth:
+  nforwardauth: # nforwardauth example configuration
     # image: nosduco/nforwardauth:v1
     build: ../../
     environment:
       - TOKEN_SECRET=example_secret_123
-      - AUTH_BACKEND_URL=nforwardauth.localhost.com
+      - COOKIE_SECURE=false # Do not set cookies as secure (optional) (WARNING: ONLY USE IN DEV OR LAN-ONLY HOSTS)
+      # - COOKIE_DOMAIN=localhost.com # Set domain for the cookies (recommended, but optional)
+      # - COOKIE_NAME=nforward-auth # Set name for the cookie (optional)
+      - AUTH_HOST=nforwardauth.localhost.com
       - PORT=3000
     labels:
       - "traefik.http.routers.nforwardauth.rule=Host(`nforwardauth.localhost.com`)"
       - "traefik.http.middlewares.nforwardauth.forwardauth.address=http://nforwardauth:3000"
       - "traefik.http.services.nforwardauth.loadbalancer.server.port=3000"
+    volumes:
+      - "./passwd:/passwd:ro" # Mount local passwd file at /passwd as read-only
