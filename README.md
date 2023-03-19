@@ -28,7 +28,7 @@ echo "test:$(mkpasswd -m sha-512 test)" >> /path/to/passwd
 
 ```
 
-The `passwd` file should contain one line per use in the format `username:hased_password`, with each user's information seperated by a newline character (`\n`).
+The `passwd` file should contain one line per use in the format `username:hased_password`.
 
 When you run the nforwardauth container, you should mount the `passwd` file as a volume with the `-v` option when using the command line, like this:
 ```bash
