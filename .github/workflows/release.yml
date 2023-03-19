@@ -20,4 +20,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: nosduco/nforwardauth:latest,nosduco/nforwardauth:v1,nosduco/nforwardauth:$GITHUB_REF_NAME
+          tags: nosduco/nforwardauth:latest,nosduco/nforwardauth:v1,nosduco/nforwardauth:${{ github.ref_name }}
