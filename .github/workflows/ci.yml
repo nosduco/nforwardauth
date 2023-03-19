@@ -61,4 +61,6 @@ jobs:
           file: ./Dockerfile
           push: false
           tags: nosduco/nforwardauth:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
