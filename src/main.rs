@@ -117,7 +117,6 @@ impl Config {
 
 // Route table
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
-    println!("req: {:?}", req);
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") | (&Method::GET, "/forward") => api_forward_auth(req).await,
         (&Method::POST, "/login") => api_login(req).await,
@@ -169,7 +168,7 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
             Url::parse(format!("http://{}", headers[FORWARDED_HOST].to_str().unwrap()).as_str())?;
         if headers.contains_key(FORWARDED_PROTO) {
             if let Err(_e) = referral_url.set_scheme(headers[FORWARDED_PROTO].to_str().unwrap()) {
-                println!("Error setting protocol for referral url.");
+                println!("Error: Failed setting protocol for referral url.");
             }
         }
         if headers.contains_key(FORWARDED_URI) {
@@ -192,7 +191,8 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // Decode JSON
     let data: serde_json::Value = serde_json::from_reader(body.reader())?;
     // Process login and find user in passwd file
-    let find_hash = get_user_hash(data["username"].as_str().unwrap()).await?;
+    let user = data["username"].as_str().unwrap();
+    let find_hash = get_user_hash(user).await?;
     if find_hash.is_some() {
         // User found, verify password with hash
         let hash = find_hash.unwrap();
@@ -202,9 +202,9 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
             // Correct login, generate claims and token
             let mut claims = BTreeMap::new();
             claims.insert("authenticated", "true");
+            claims.insert("user", user);
             let mut now = OffsetDateTime::now_utc();
             now += Duration::days(7);
-            println!("cookie domain: {}", &Config::global().cookie_domain);
             let cookie = Cookie::build(
                 &Config::global().cookie_name,
                 claims.sign_with_key(&Config::global().key).unwrap(),
@@ -295,7 +295,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 .serve_connection(stream, service_fn(api))
                 .await
             {
-                println!("Error serving connection: {:?}", err);
+                println!("Error: Failed serving connection: {:?}", err);
             }
         });
     }
