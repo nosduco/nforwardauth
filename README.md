@@ -152,5 +152,5 @@ If you find a bug or have a suggestion for how to improve nforwardauth or additi
 
 ## License
 
-nforwardauth is released under the mit license. please see the [license](https://giuthub.com/nosduco/nforwardauth/blob/main/license.md) file for details.
+nforwardauth is released under the MIT license. please see the [license](https://giuthub.com/nosduco/nforwardauth/blob/main/license.md) file for details.
 
