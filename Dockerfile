@@ -1,6 +1,6 @@
 # STAGE: Build
 FROM rust:1.67.1 as builder
-WORKDIR /usr/src/app
+WORKDIR /build
 
 # Install cargo-strip (with layer cacheing)
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
@@ -11,14 +11,14 @@ COPY ./ ./
 
 # Download dependencies and compile (with layer cacheing)
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/src/app/target \
+    --mount=type=cache,target=/build/target \
     cargo build --release && \
     cargo strip && \
-    mv /usr/src/app/target/release/nforwardauth /usr/src/app
+    mv /build/target/release/nforwardauth /build
 
 # STAGE: Minify
 FROM node:19.8.1 as minifier
-WORKDIR /app
+WORKDIR /build
 
 # Install CSS minifier (lightningcss)
 RUN npm install -g lightningcss-cli
@@ -46,13 +46,13 @@ FROM debian:buster-slim
 WORKDIR /app
 
 # Copy binary from build stage
-COPY --from=builder /usr/src/app/nforwardauth /app/nforwardauth
+COPY --from=builder /build/nforwardauth /app/nforwardauth
 
 # Copy files and assets to serve (overwritable via docker volume mount)
-COPY ./public /app/public
-COPY --from=minifier /app/style.css /app/public/style.css
-COPY --from=minifier /app/script.js /app/public/script.js
-COPY --from=minifier /app/index.html /app/public/index.html
+COPY ./public /public
+COPY --from=minifier /build/style.css /public/style.css
+COPY --from=minifier /build/script.js /public/script.js
+COPY --from=minifier /build/index.html /public/index.html
 
 # Set entrypoint for image
 ENTRYPOINT ["./nforwardauth"]

@@ -31,7 +31,7 @@ static FORWARDED_PROTO: &str = "X-Forwarded-Proto";
 static FORWARDED_URI: &str = "X-Forwarded-Uri";
 
 /* File Paths */
-static INDEX_DOCUMENT: &str = "public/index.html";
+static INDEX_DOCUMENT: &str = "/public/index.html";
 static PASSWD_FILE: &str = "/passwd";
 
 /* HTTP Status Responses */
@@ -124,7 +124,7 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
         (&Method::GET, "/login") => api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await,
         _ => {
             api_serve_file(
-                format!("public{}", req.uri().path()).as_str(),
+                format!("/public{}", req.uri().path()).as_str(),
                 StatusCode::OK,
             )
             .await
