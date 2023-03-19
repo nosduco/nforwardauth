@@ -6,12 +6,7 @@
 
 nforwardauth is a simple and minimalist forward auth service that lets you use a single authentication middleware for all your sites (intended for use with [Traefik](https://github.com/traefik/traefik)).
 
-<details>
-  <summary>Screenshots</summary>
-
-  ![Screenshot](https://github.com/nosduco/nforwardauth/blob/main/screenshot.png)
-
-</details>
+![Screenshot](https://github.com/nosduco/nforwardauth/blob/main/screenshot.png)
 
 ## Why nforwardauth?
 
