@@ -20,4 +20,4 @@ services:
       - AUTH_HOST=nforwardauth.localhost.com # (required)
       - PORT=3000
     volumes:
-      - "./passwd:/passwd:ro" # Mount local passwd file at /passwd as read-only
+      - "../passwd:/passwd:ro" # Mount local passwd file at /passwd as read-only

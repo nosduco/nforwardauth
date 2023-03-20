@@ -30,4 +30,4 @@ services:
       - "traefik.http.middlewares.nforwardauth.forwardauth.address=http://nforwardauth:3000"
       - "traefik.http.services.nforwardauth.loadbalancer.server.port=3000"
     volumes:
-      - "./passwd:/passwd:ro" # Mount local passwd file at /passwd as read-only
+      - "../passwd:/passwd:ro" # Mount local passwd file at /passwd as read-only
