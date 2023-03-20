@@ -1,0 +1,18 @@
+# Disable HTTPS for this example (WARNING: Do not use in production)
+{
+    auto_https off
+    https_port 80
+}
+
+# nforwardauth Endpoint.
+nforwardauth.localhost.com {
+    reverse_proxy nforwardauth:3000
+}
+
+# Protected Endpoint.
+whoami.localhost.com {
+    forward_auth nforwardauth:3000 {
+      uri /
+    }
+    reverse_proxy whoami:80
+}

@@ -1,0 +1,23 @@
+version: "3"
+
+services:
+  caddy: # Basic caddy v2 configuration
+    image: caddy:2.6.4-alpine
+    ports:
+      - "80:80" # HTTP port
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+  whoami: # Simple whoami container to test functionality (available via Caddy at http://whoami.localhost.com)
+    image: traefik/whoami
+  nforwardauth: # nforwardauth example configuration
+    # image: nosduco/nforwardauth:v1
+    build: ../../
+    environment:
+      - TOKEN_SECRET=example_secret_123 # (required)
+      - COOKIE_SECURE=false # Do not set cookies as secure (not recommended, and optional) (WARNING: ONLY USE IN DEV OR LAN-ONLY HOSTS)
+      # - COOKIE_DOMAIN=localhost.com # Set domain for the cookies (recommended, but optional)
+      # - COOKIE_NAME=nforward-auth # Set name for the cookie (optional)
+      - AUTH_HOST=nforwardauth.localhost.com # (required)
+      - PORT=3000
+    volumes:
+      - "./passwd:/passwd:ro" # Mount local passwd file at /passwd as read-only
