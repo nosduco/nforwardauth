@@ -4,7 +4,7 @@
 [![Docker Image Size](https://img.shields.io/docker/image-size/nosduco/nforwardauth)](https://hub.docker.com/r/nosduco/nforwardauth)
 [![Docker Image Version](https://img.shields.io/docker/v/nosduco/nforwardauth?sort=semver)](https://hub.docker.com/r/nosduco/nforwardauth)
 
-nforwardauth is a simple and minimalist forward auth service that lets you use a single authentication middleware for all your sites (intended for use with [Traefik](https://github.com/traefik/traefik)).
+nforwardauth is an extremely lightweight, blazing fast forward auth service that lets you use a single authentication middleware for all your sites. It is intended for use with reverse proxies like [Traefik](https://github.com/traefik/traefik), [Caddy](https://github.com/caddyserver/caddy), [nginx](https://nginx.com), and others to allow/deny access via an auth wall.
 
 ![Screenshot](https://github.com/nosduco/nforwardauth/blob/main/screenshot.png)
 
@@ -13,6 +13,16 @@ nforwardauth is a simple and minimalist forward auth service that lets you use a
 The inspiration for nforwardauth came from my frustration with using basic auth as a simple way to protect my self-hosted server applications. I wanted something that was more user-friendly and streamlined, and that didn't require me to authenticate with every site and allowed me to autofill my passwords with my password manager.
 
 I also wanted something that could be used in conjunction with other self-host server homepages like [Homer](https://github.com/bastienwirtz/homer) and [homepage](https://github.com/benphelps/homepage). I was impressed with how [Organizr's](https://github.com/organizr) forwardauth worked, but I found it to be too complex and heavy for my needs. That's why I decided to create nforwardauth, a simple and lightweight alternative that gets the job done without any unnecessary bells and whistles.
+
+## How it works
+
+Here is a simple illustration of how nforwardauth integrates with reverse proxies. (Note: you do not have to protect all sites with forwardauth as they don't have to be configured with the middleware):
+
+![Diagram](https://github.com/nosduco/nforwardauth/blob/main/diagram.png)
+
+When you visit a route/host that is protected by nforwardauth, the server will first forward the request to nforwardauth which will check whether or not your request contains a valid access token. If your request does not, you will be redirected to the nforwardauth login page. Upon logging in, you will be redirected to the URI of your initial request.
+
+nforwardauth uses a `passwd` file to store valid credentials. Currently, it only supports username and password combinations (similar to that of HTTP basic auth).
 
 ## Getting started
 
@@ -31,7 +41,11 @@ The `passwd` file should contain one line per use in the format `username:hased_
 
 When you run the nforwardauth container, you should mount the `passwd` file as a volume with the `-v` option when using the command line, like this:
 ```bash
-docker run -p 3000:3000 -v /path/to/passwd:/passwd nosduco/nforwardauth:v1
+docker run -p 3000:3000 \
+  -e TOKEN_SECRET=example-secret-123 \
+  -e AUTH_HOST=nforwardauth.localhost.com \
+  -v /path/to/passwd:/passwd \
+  nosduco/nforwardauth:v1
 ```
 
 With your `passwd` file mounted, nforwardauth will use it to authenticate users when they access sites with the forwardauth middleware. You will only need to login once to access all sites behind the middleware.
@@ -151,5 +165,5 @@ If you find a bug or have a suggestion for how to improve nforwardauth or additi
 
 ## License
 
-nforwardauth is released under the MIT license. please see the [license](https://giuthub.com/nosduco/nforwardauth/blob/main/license.md) file for details.
+nforwardauth is released under the MIT license. please see the [LICENSE](https://giuthub.com/nosduco/nforwardauth/blob/main/license.md) file for details.
 
