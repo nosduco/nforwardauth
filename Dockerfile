@@ -1,6 +1,9 @@
 # STAGE: Build
-FROM rust:1.67.1 as builder
+FROM rust:1.68.0-alpine3.17 as builder
 WORKDIR /build
+
+# Install alpine deps
+RUN apk add --no-cache build-base
 
 # Install cargo-strip (with layer cacheing)
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
@@ -42,11 +45,10 @@ RUN npx uglifyjs --compress --mangle -o ./script.js -- ./assets/js/script.js
 RUN npx html-minifier --collapse-whitespace --remove-comments --remove-original-tags --remove-rundundant-attributes --remove-script-type-attributes --remove-tag-whitespace --use-short-doctype -o ./index.html ./assets/html/index.html
 
 # STAGE: Release
-FROM debian:buster-slim
-WORKDIR /app
+FROM alpine:3.17
 
 # Copy binary from build stage
-COPY --from=builder /build/nforwardauth /app/nforwardauth
+COPY --from=builder /build/nforwardauth /nforwardauth
 
 # Copy files and assets to serve (overwritable via docker volume mount)
 COPY ./public /public
@@ -55,4 +57,4 @@ COPY --from=minifier /build/script.js /public/script.js
 COPY --from=minifier /build/index.html /public/index.html
 
 # Set entrypoint for image
-ENTRYPOINT ["./nforwardauth"]
+ENTRYPOINT ["/nforwardauth"]
