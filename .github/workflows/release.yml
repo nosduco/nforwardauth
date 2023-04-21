@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
+      - uses: docker/setup-qemu-action@v1
       - uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -19,5 +20,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/amd64,linux/arm/v7,linux/arm64
           push: true
+          pull: true
           tags: nosduco/nforwardauth:latest,nosduco/nforwardauth:v1,nosduco/nforwardauth:${{ github.ref_name }}
