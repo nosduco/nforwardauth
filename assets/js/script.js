@@ -26,7 +26,6 @@ const handleResponse = (res) => {
     case 200:
       // Authenticated, redirect to referral (if exists)
       if (params.r) {
-        console.log("running redirect...");
         window.location.replace(params.r);
       } else {
         // Show alert
