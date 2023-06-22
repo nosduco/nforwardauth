@@ -7,8 +7,9 @@ use bytes::Buf;
 use cookie::time::{Duration, OffsetDateTime};
 use cookie::{Cookie, SameSite};
 use hmac::{Hmac, Mac};
+use http_auth_basic::Credentials;
 use http_body_util::BodyExt;
-use hyper::header::{CONTENT_TYPE, COOKIE, LOCATION, SET_COOKIE, AUTHORIZATION};
+use hyper::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE, LOCATION, SET_COOKIE};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{body::Incoming as IncomingBody, Request, Response};
@@ -23,7 +24,6 @@ use std::net::SocketAddr;
 use tokio::fs;
 use tokio::net::TcpListener;
 use url::Url;
-use http_auth_basic::Credentials;
 
 /* Header Names */
 static FORWARDED_HOST: &str = "X-Forwarded-Host";
@@ -152,7 +152,7 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
                 let claims: BTreeMap<String, String> =
                     token_str.verify_with_key(&Config::global().key).unwrap();
                 if claims["authenticated"] == "true" {
-                    return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await
+                    return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
                 }
             }
         }
@@ -172,7 +172,7 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
             let verify = pwhash::unix::verify(&credentials.password, &hash);
             if verify {
                 // Correct login
-                return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await
+                return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
             }
         }
     }
