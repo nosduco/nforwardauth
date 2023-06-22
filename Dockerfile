@@ -1,5 +1,5 @@
 # STAGE: Build
-FROM rust:1.68.0-alpine3.17 as builder
+FROM rust:1-alpine3.17 as builder
 WORKDIR /build
 
 # Install alpine deps
