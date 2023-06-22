@@ -8,7 +8,7 @@ use cookie::time::{Duration, OffsetDateTime};
 use cookie::{Cookie, SameSite};
 use hmac::{Hmac, Mac};
 use http_body_util::BodyExt;
-use hyper::header::{CONTENT_TYPE, COOKIE, LOCATION, SET_COOKIE};
+use hyper::header::{CONTENT_TYPE, COOKIE, LOCATION, SET_COOKIE, AUTHORIZATION};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{body::Incoming as IncomingBody, Request, Response};
@@ -23,6 +23,7 @@ use std::net::SocketAddr;
 use tokio::fs;
 use tokio::net::TcpListener;
 use url::Url;
+use http_auth_basic::Credentials;
 
 /* Header Names */
 static FORWARDED_HOST: &str = "X-Forwarded-Host";
@@ -136,7 +137,7 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
 
 // ForwardAuth route
 async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
-    // Get token from request headers
+    // Get token from request headers and check if cookie exists
     let headers = req.headers();
     if headers.contains_key(COOKIE) {
         // Grab cookies from headers
@@ -153,6 +154,25 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
                 if claims["authenticated"] == "true" {
                     return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await
                 }
+            }
+        }
+    }
+
+    // Check if basic auth exists
+    if headers.contains_key(AUTHORIZATION) {
+        // Grab basic auth header and parse credentials
+        let basic_auth = headers[AUTHORIZATION].to_str().unwrap();
+        let credentials = Credentials::from_header(basic_auth.to_string()).unwrap();
+
+        // Check login against passwd file
+        let find_hash = get_user_hash(&credentials.user_id).await?;
+        if find_hash.is_some() {
+            // User found, verify password with hash
+            let hash = find_hash.unwrap();
+            let verify = pwhash::unix::verify(&credentials.password, &hash);
+            if verify {
+                // Correct login
+                return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await
             }
         }
     }
