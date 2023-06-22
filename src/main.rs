@@ -31,12 +31,14 @@ static FORWARDED_URI: &str = "X-Forwarded-Uri";
 
 /* File Paths */
 static INDEX_DOCUMENT: &str = "/public/index.html";
+static LOGOUT_DOCUMENT: &str = "/public/logout.html";
 static PASSWD_FILE: &str = "/passwd";
 
 /* HTTP Status Responses */
 static NOT_FOUND: &[u8] = b"Not Found";
 static UNAUTHORIZED: &[u8] = b"Unauthorized";
 static AUTHORIZED: &[u8] = b"Authorized";
+static LOGGED_OUT: &[u8] = b"Logged Out";
 
 /* Config Singleton Instance and Implementation */
 static INSTANCE: OnceCell<Config> = OnceCell::new();
@@ -120,6 +122,8 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
         (&Method::GET, "/") | (&Method::GET, "/forward") => api_forward_auth(req).await,
         (&Method::POST, "/login") => api_login(req).await,
         (&Method::GET, "/login") => api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await,
+        (&Method::POST, "/logout") => api_logout().await,
+        (&Method::GET, "/logout") => api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await,
         _ => {
             api_serve_file(
                 format!("/public{}", req.uri().path()).as_str(),
@@ -147,10 +151,7 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
                 let claims: BTreeMap<String, String> =
                     token_str.verify_with_key(&Config::global().key).unwrap();
                 if claims["authenticated"] == "true" {
-                    return Ok(Response::builder()
-                        .status(StatusCode::OK)
-                        .body(full(AUTHORIZED))
-                        .unwrap());
+                    return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await
                 }
             }
         }
@@ -229,6 +230,26 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         .status(StatusCode::UNAUTHORIZED)
         .body(full(UNAUTHORIZED))
         .unwrap())
+}
+
+// Logout route
+async fn api_logout() -> Result<Response<BoxBody>> {
+    // Build cookie in past to expire existing cookies in browser
+    let past = OffsetDateTime::now_utc() - Duration::days(1);
+    let expired_cookie = Cookie::build(&Config::global().cookie_name, "")
+        .domain(&Config::global().cookie_domain)
+        .http_only(true)
+        .secure(Config::global().cookie_secure)
+        .same_site(SameSite::Strict)
+        .expires(past)
+        .finish();
+
+    // Return OK with cookie
+    return Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(SET_COOKIE, expired_cookie.to_string())
+        .body(full(LOGGED_OUT))
+        .unwrap());
 }
 
 // Serve file route

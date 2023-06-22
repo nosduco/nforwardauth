@@ -16,27 +16,23 @@ const displayAlert = (msg, variant) => {
   }, 10);
 };
 
-const handleError = () => {
+const handleError = (err) => {
   // Unexpected error occurred, show alert
   displayAlert("Unexpected error occurred.", "error");
+  console.log("Error occurred", err);
 };
 
 const handleResponse = (res) => {
   switch (res.status) {
     case 200:
-      // Authenticated, redirect to referral (if exists)
-      if (params.r) {
-        window.location.replace(params.r);
-      } else {
-        // Redirect to logout page
-        window.location.replace("/logout?success=true");
-      }
-      break;
-    case 401:
-      // Bad credentials
-      document.getElementById("password").value = "";
-      displayAlert("Incorrect credentials.", "error");
-      setFieldsDisabled(false);
+      // Logged out successfully.
+      displayAlert(
+        "You have successfully logged out, redirecting to login...",
+        "success"
+      );
+      setInterval(() => {
+        window.location.replace("/login");
+      }, 2000);
       break;
     default:
       // Unexpected status code
@@ -46,31 +42,15 @@ const handleResponse = (res) => {
   }
 };
 
-// Login function
-const login = () => {
-  // Get form values
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
-
-  // Validation
-  if (username == "" || password == "") {
-    alert("Please make sure all fields are filled.");
-    return;
-  }
-
-  // Create data object to send
-  const data = {
-    username,
-    password,
-  };
-
+// Logout function
+const logout = () => {
   // Disable fields until after request
   setFieldsDisabled(true);
 
   // Sent HTTP request
-  fetch("/login", {
+  fetch("/logout", {
     method: "post",
-    body: JSON.stringify(data),
+    body: JSON.stringify({}),
     headers: { "Content-Type": "application/json" },
   })
     .then(handleResponse)
@@ -79,11 +59,14 @@ const login = () => {
 
 const setFieldsDisabled = (disabled) => {
   // Set fields disabled attributes
-  document.getElementById("username").disabled = disabled;
-  document.getElementById("password").disabled = disabled;
   document.getElementById("submit").disabled = disabled;
 };
 
 // Configure submit button click to trigger login
 const submitButton = document.getElementById("submit");
-submitButton.onclick = login;
+submitButton.onclick = logout;
+
+// Set banner if just logged in
+if (params.success) {
+  displayAlert("You have successfully logged in.", "success");
+}
