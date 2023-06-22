@@ -265,11 +265,11 @@ async fn api_logout() -> Result<Response<BoxBody>> {
         .finish();
 
     // Return OK with cookie
-    return Ok(Response::builder()
+    Ok(Response::builder()
         .status(StatusCode::OK)
         .header(SET_COOKIE, expired_cookie.to_string())
         .body(full(LOGGED_OUT))
-        .unwrap());
+        .unwrap())
 }
 
 // Serve file route
