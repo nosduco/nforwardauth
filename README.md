@@ -24,6 +24,8 @@ When you visit a route/host that is protected by nforwardauth, the server will f
 
 nforwardauth uses a `passwd` file to store valid credentials. Currently, it only supports username and password combinations (similar to that of HTTP basic auth).
 
+***Note: You can still pass basic auth in the URL and skip the login page. This compatibility exists for applications like nzb360.***
+
 ## Getting started
 
 #### How the `passwd` file works
