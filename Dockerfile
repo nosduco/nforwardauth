@@ -1,18 +1,18 @@
 # STAGE: Build
-FROM rust:1.68.0-alpine3.17 as builder
+FROM rust:1-alpine3.17 as builder
 WORKDIR /build
 
 # Install alpine deps
 RUN apk add --no-cache build-base
 
-# Install cargo-strip (with layer cacheing)
+# Install cargo-strip (with layer caching)
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
   cargo install cargo-strip
 
 # Copy source files
 COPY ./ ./
 
-# Download dependencies and compile (with layer cacheing)
+# Download dependencies and compile (with layer caching)
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
     cargo build --release && \
@@ -23,14 +23,10 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 FROM node:19.8.1 as minifier
 WORKDIR /build
 
-# Install CSS minifier (lightningcss)
-RUN npm install -g lightningcss-cli
-
-# Install JS minifier (uglify-js)
-RUN npm install -g uglify-js
-
-# Install HTML minifier (html-minifier)
-RUN npm install -g html-minifier
+# Install CSS minifier (lightningcss), JS minifier (uglify-js), and HTML minifier (html-minifier)
+RUN npm install -g lightningcss-cli \
+  && npm install -g uglify-js \
+  && npm install -g html-minifier
 
 # Copy assets folder
 COPY ./assets ./assets
@@ -39,10 +35,12 @@ COPY ./assets ./assets
 RUN npx lightningcss --minify --bundle --targets '>= 0.25%' ./assets/css/style.css -o ./style.css
 
 # Minify JS
-RUN npx uglifyjs --compress --mangle -o ./script.js -- ./assets/js/script.js 
+RUN npx uglifyjs --compress --mangle -o ./script.js -- ./assets/js/script.js  \
+    && npx uglifyjs --compress --mangle -o ./logout.js -- ./assets/js/logout.js 
 
 # Minify HTML
-RUN npx html-minifier --collapse-whitespace --remove-comments --remove-original-tags --remove-rundundant-attributes --remove-script-type-attributes --remove-tag-whitespace --use-short-doctype -o ./index.html ./assets/html/index.html
+RUN npx html-minifier --collapse-whitespace --remove-comments --remove-original-tags --remove-rundundant-attributes --remove-script-type-attributes --remove-tag-whitespace --use-short-doctype -o ./index.html ./assets/html/index.html \
+  && npx html-minifier --collapse-whitespace --remove-comments --remove-original-tags --remove-rundundant-attributes --remove-script-type-attributes --remove-tag-whitespace --use-short-doctype -o ./logout.html ./assets/html/logout.html
 
 # STAGE: Release
 FROM alpine:3.17
@@ -54,7 +52,9 @@ COPY --from=builder /build/nforwardauth /nforwardauth
 COPY ./public /public
 COPY --from=minifier /build/style.css /public/style.css
 COPY --from=minifier /build/script.js /public/script.js
+COPY --from=minifier /build/logout.js /public/logout.js
 COPY --from=minifier /build/index.html /public/index.html
+COPY --from=minifier /build/logout.html /public/logout.html
 
 # Set entrypoint for image
 ENTRYPOINT ["/nforwardauth"]

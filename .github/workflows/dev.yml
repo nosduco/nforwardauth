@@ -1,12 +1,13 @@
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - dev
 
-name: Release
+name: Dev
 
 jobs:
   build-and-release:
-    name: Build and Release
+    name: Build and Release (dev)
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
@@ -23,4 +24,4 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           pull: true
-          tags: nosduco/nforwardauth:latest,nosduco/nforwardauth:v1,nosduco/nforwardauth:${{ github.ref_name }}
+          tags: nosduco/nforwardauth:dev,nosduco/nforwardauth:${{ github.ref_name }}
