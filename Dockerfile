@@ -24,9 +24,9 @@ FROM node:19.8.1 as minifier
 WORKDIR /build
 
 # Install CSS minifier (lightningcss), JS minifier (uglify-js), and HTML minifier (html-minifier)
-RUN npm install -g lightningcss-cli \
-  && npm install -g uglify-js \
-  && npm install -g html-minifier
+RUN npm install -g lightningcss-cli@1.21.5 \
+  && npm install -g uglify-js@3.17.4 \
+  && npm install -g html-minifier@4.0.0
 
 # Copy assets folder
 COPY ./assets ./assets
