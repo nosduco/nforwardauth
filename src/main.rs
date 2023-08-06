@@ -13,6 +13,7 @@ use hyper::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE, LOCATION, SET_COOKIE};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{body::Incoming as IncomingBody, Request, Response};
+use hyper_util::rt::TokioIo;
 use hyper::{Method, StatusCode};
 use jwt::{SignWithKey, VerifyWithKey};
 use once_cell::sync::OnceCell;
@@ -326,13 +327,14 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Start loop to continuously accept incoming connections
     loop {
         let (stream, _) = listener.accept().await?;
+        let io = TokioIo::new(stream);
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             // Finally, bind the incoming connection to our index service
             if let Err(err) = http1::Builder::new()
                 // Convert function to service
-                .serve_connection(stream, service_fn(api))
+                .serve_connection(io, service_fn(api))
                 .await
             {
                 println!("Error: Failed serving connection: {:?}", err);
