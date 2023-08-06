@@ -13,8 +13,8 @@ use hyper::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE, LOCATION, SET_COOKIE};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{body::Incoming as IncomingBody, Request, Response};
-use hyper_util::rt::TokioIo;
 use hyper::{Method, StatusCode};
+use hyper_util::rt::TokioIo;
 use jwt::{SignWithKey, VerifyWithKey};
 use once_cell::sync::OnceCell;
 use regex::Regex;
@@ -24,6 +24,7 @@ use std::env;
 use std::net::SocketAddr;
 use tokio::fs;
 use tokio::net::TcpListener;
+use tokio::signal::unix::{signal, SignalKind};
 use url::Url;
 
 /* Header Names */
@@ -319,26 +320,57 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     INSTANCE.set(config).unwrap();
     println!("Loaded configuration.");
 
+    // Setup signal handling
+    let mut term_signal = signal(SignalKind::terminate())?;
+    let mut int_signal = signal(SignalKind::interrupt())?;
+
     // Create TcpListener and bind
     let addr = SocketAddr::from(([0, 0, 0, 0], Config::global().port));
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on http://{}", addr);
 
-    // Start loop to continuously accept incoming connections
-    loop {
-        let (stream, _) = listener.accept().await?;
-        let io = TokioIo::new(stream);
+    // Create a future to handle server startup
+    let server = async {
+        // Start loop to continuously accept incoming connections
+        loop {
+            match listener.accept().await {
+                Ok((stream, _)) => {
+                    let io = TokioIo::new(stream);
 
-        // Spawn a tokio task to serve multiple connections concurrently
-        tokio::task::spawn(async move {
-            // Finally, bind the incoming connection to our index service
-            if let Err(err) = http1::Builder::new()
-                // Convert function to service
-                .serve_connection(io, service_fn(api))
-                .await
-            {
-                println!("Error: Failed serving connection: {:?}", err);
-            }
-        });
+                    // Spawn a tokio task to serve multiple connections concurrently
+                    tokio::task::spawn(async move {
+                        // Finally, bind the incoming connection to our index service
+                        if let Err(err) = http1::Builder::new()
+                            // Convert function to service
+                            .serve_connection(io, service_fn(api))
+                            .await
+                        {
+                            println!("Error: Failed serving connection: {:?}", err);
+                        }
+                    });
+                },
+                Err(e) => {
+                    println!("Error accepting connection: {:?}", e);
+                    continue;
+                }
+            };
+        }
+    };
+
+    // Create a future to handle signals
+    let shutdown_signal = async {
+        tokio::select! {
+            _ = term_signal.recv() => {},
+            _ = int_signal.recv() => {},
+        }
+    };
+
+    // Run server with signal handling
+    tokio::select! {
+        _ = server => {},
+        _ = shutdown_signal => {
+            println!("Shutdown signal received, shutting down...")
+        },
     }
+    Ok(())
 }
