@@ -87,3 +87,14 @@ const setFieldsDisabled = (disabled) => {
 // Configure submit button click to trigger login
 const submitButton = document.getElementById("submit");
 submitButton.onclick = login;
+
+// Configure ENTER key-press to trigger login
+const form = document.getElementById("form");
+form.addEventListener('keydown', (e) => {
+  // Listen to 'keydown' event and check if Enter key
+  if (e.key === 'Enter') {
+    // Prevent default and trigger login
+    e.preventDefault();
+    login();
+  }
+});
