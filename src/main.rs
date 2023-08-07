@@ -90,9 +90,8 @@ impl Config {
         let cookie_domain: String = match env::var("COOKIE_DOMAIN") {
             Ok(value) => value,
             Err(..) => {
-                if let Some(..) = host {
-                    host.unwrap()
-                        .get(0)
+                if host.is_some() {
+                    host.and_then(|h| h.get(0))
                         .map_or(auth_host.clone().as_str(), |m| m.as_str())
                         .to_string()
                 } else {
