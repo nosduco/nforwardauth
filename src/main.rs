@@ -348,7 +348,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                             println!("Error: Failed serving connection: {:?}", err);
                         }
                     });
-                },
+                }
                 Err(e) => {
                     println!("Error accepting connection: {:?}", e);
                     continue;
