@@ -62,7 +62,8 @@ button {
   border: none;
   border-radius: 5px;
   font-size: 1.1em;
-  background-color: #fda50f;
+  font-weight: 600;
+  background-color: #1a7198;
   color: white;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -71,7 +72,7 @@ button {
 }
 
 button:hover {
-  background-color: #ffbd2f;
+  background-color: #228ebf;
 }
 
 button:focus {
