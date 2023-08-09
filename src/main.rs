@@ -1,4 +1,5 @@
 mod config;
+mod middleware;
 mod util;
 
 use crate::config::Config;
@@ -6,7 +7,6 @@ use crate::util::{full, BoxBody, Result};
 use bytes::Buf;
 use cookie::time::{Duration, OffsetDateTime};
 use cookie::{Cookie, SameSite};
-use hmac::{Hmac, Mac};
 use http_auth_basic::Credentials;
 use http_body_util::BodyExt;
 use hyper::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE, LOCATION, SET_COOKIE};
@@ -16,12 +16,9 @@ use hyper::{body::Incoming as IncomingBody, Request, Response};
 use hyper::{Method, StatusCode};
 use hyper_util::rt::TokioIo;
 use jwt::{SignWithKey, VerifyWithKey};
-use once_cell::sync::OnceCell;
 use regex::Regex;
-use sha2::Sha256;
 use std::collections::BTreeMap;
-use std::env;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use tokio::fs;
 use tokio::net::TcpListener;
 use tokio::signal::unix::{signal, SignalKind};
@@ -31,6 +28,7 @@ use url::Url;
 static FORWARDED_HOST: &str = "X-Forwarded-Host";
 static FORWARDED_PROTO: &str = "X-Forwarded-Proto";
 static FORWARDED_URI: &str = "X-Forwarded-Uri";
+static FORWARDED_FOR: &str = "X-Forwarded-For";
 
 /* File Paths */
 static INDEX_DOCUMENT: &str = "/public/index.html";
@@ -42,81 +40,6 @@ static NOT_FOUND: &[u8] = b"Not Found";
 static UNAUTHORIZED: &[u8] = b"Unauthorized";
 static AUTHORIZED: &[u8] = b"Authorized";
 static LOGGED_OUT: &[u8] = b"Logged Out";
-
-/* Config Singleton Instance and Implementation */
-static INSTANCE: OnceCell<Config> = OnceCell::new();
-impl Config {
-    pub fn global() -> &'static Config {
-        INSTANCE.get().expect("config is not initialized")
-    }
-
-    fn initialize() -> Result<Config> {
-        // port: Port server should bind and listen on
-        let port: u16 = match env::var("PORT") {
-            Ok(port) => port.parse::<u16>().unwrap(),
-            Err(..) => 3000,
-        };
-
-        // key: Generate key from environment variable or randomly generated secret
-        let key: Hmac<Sha256> = match env::var("TOKEN_SECRET") {
-            Ok(secret) => {
-                // Generate key from environment variable containing custom secret
-                Hmac::new_from_slice(secret.as_bytes()).unwrap()
-            }
-            Err(..) => {
-                println!("Error: missing TOKEN_SECRET environment variable");
-                std::process::exit(78);
-            }
-        };
-
-        // auth_backend_url: Grab auth backend URL from environment variable
-        let auth_host: String = match env::var("AUTH_HOST") {
-            Ok(value) => value,
-            Err(..) => {
-                println!("Error: missing AUTH_HOST environment variable");
-                std::process::exit(78);
-            }
-        };
-
-        // cookie_secure: Whether cookie secure flag should be set
-        let cookie_secure: bool = match env::var("COOKIE_SECURE") {
-            Ok(secure) => secure != "false",
-            Err(..) => true,
-        };
-
-        // cookie_domain: Domain cookie should be set for
-        let regex = Regex::new(r"[^.]*.[^.]*$").unwrap();
-        let host = regex.captures(&auth_host);
-        let cookie_domain: String = match env::var("COOKIE_DOMAIN") {
-            Ok(value) => value,
-            Err(..) => {
-                if host.is_some() {
-                    host.and_then(|h| h.get(0))
-                        .map_or(auth_host.clone().as_str(), |m| m.as_str())
-                        .to_string()
-                } else {
-                    auth_host.clone()
-                }
-            }
-        };
-
-        // cookie_name: Name of cookie to set
-        let cookie_name: String = match env::var("COOKIE_NAME") {
-            Ok(value) => value,
-            Err(..) => "nforwardauth".to_string(),
-        };
-
-        // Return config instance with initialized values
-        Ok(Config {
-            port,
-            key,
-            auth_host,
-            cookie_secure,
-            cookie_domain,
-            cookie_name,
-        })
-    }
-}
 
 // Route table
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
@@ -207,6 +130,26 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
 
 // Login route
 async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
+    // Middleware: rate limiter
+    let headers = req.headers();
+    if headers.contains_key(FORWARDED_FOR) {
+        let x_forwarded_for = headers[FORWARDED_FOR].to_str().unwrap();
+        let source_ip = x_forwarded_for.split(',').next().unwrap_or(x_forwarded_for);
+        if let Ok(ip) = source_ip.trim().parse::<IpAddr>() {
+            // Call rate limiter
+        } else {
+            println!(
+                "Warning: Failed to parse {} header from request.",
+                FORWARDED_FOR
+            );
+        }
+    } else {
+        println!(
+            "Warning: Request without {} header processed.",
+            FORWARDED_FOR
+        );
+    }
+
     // Aggregate request body
     let body = req.collect().await?.aggregate();
     // Decode JSON
@@ -315,8 +258,7 @@ async fn get_user_hash(user: &str) -> Result<Option<String>> {
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Initialize config (port, token secret, auth backend url, ...)
-    let config = Config::initialize().unwrap();
-    INSTANCE.set(config).unwrap();
+    Config::initialize()?;
     println!("Loaded configuration.");
 
     // Setup signal handling
