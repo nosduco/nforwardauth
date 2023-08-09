@@ -63,7 +63,8 @@ button {
   border: none;
   border-radius: 5px;
   font-size: 1.1em;
-  background-color: #fda50f;
+  font-weight: 600;
+  background-color: #ffa100;
   color: white;
   text-transform: uppercase;
   letter-spacing: 1px;
