@@ -63,7 +63,7 @@ button {
   border-radius: 5px;
   font-size: 1.1em;
   font-weight: 600;
-  background-color: #1a7198;
+  background-color: #ffa100;
   color: white;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -72,7 +72,7 @@ button {
 }
 
 button:hover {
-  background-color: #228ebf;
+  background-color: #ffbd2f;
 }
 
 button:focus {
