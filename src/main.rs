@@ -233,7 +233,7 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
             .domain(&Config::global().cookie_domain)
             .http_only(true)
             .secure(Config::global().cookie_secure)
-            .same_site(SameSite::Strict)
+            .same_site(SameSite::Lax)
             .expires(now)
             .finish();
 
@@ -261,7 +261,7 @@ async fn api_logout() -> Result<Response<BoxBody>> {
         .domain(&Config::global().cookie_domain)
         .http_only(true)
         .secure(Config::global().cookie_secure)
-        .same_site(SameSite::Strict)
+        .same_site(SameSite::Lax)
         .expires(past)
         .finish();
 
