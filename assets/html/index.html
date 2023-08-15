@@ -19,17 +19,19 @@
           <p id="alert-message"></p>
         </div>
         <h1>Login</h1>
-        <div class="login-mask-control">
-          <label for="username">Username</label>
-          <input type="text" id="username" name="username" autocomplete="username" required autofocus>
-        </div>
-        <div class="login-mask-control">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" autocomplete="current-password" required>
-        </div>
-        <div class="button-container">
-          <button id="submit">Submit</button>
-        </div>
+        <form>
+          <div class="login-mask-control">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+          </div>
+          <div class="login-mask-control">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="current-password" required>
+          </div>
+          <div class="button-container">
+            <input id="submit" type="submit" value="Submit">
+          </div>
+        </form>
       </div>
   </body>
 </html>

@@ -20,6 +20,7 @@ const handleError = (err) => {
   // Unexpected error occurred, show alert
   displayAlert("Unexpected error occurred.", "error");
   console.log("Error occurred", err);
+  setFieldsDisabled(false);
 };
 
 const handleResponse = (res) => {
@@ -43,7 +44,10 @@ const handleResponse = (res) => {
 };
 
 // Logout function
-const logout = () => {
+const logout = (event) => {
+  // override default form behaviour
+  event.preventDefault();
+
   // Disable fields until after request
   setFieldsDisabled(true);
 
@@ -62,9 +66,9 @@ const setFieldsDisabled = (disabled) => {
   document.getElementById("submit").disabled = disabled;
 };
 
-// Configure submit button click to trigger login
-const submitButton = document.getElementById("submit");
-submitButton.onclick = logout;
+// Configure form to trigger logout
+var form = document.querySelector("form");
+form.onsubmit = logout;
 
 // Set banner if just logged in
 if (params.success) {
