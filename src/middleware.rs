@@ -28,11 +28,7 @@ impl RateLimiter {
             .map(|mutex| mutex.lock().unwrap())
     }
 
-    pub fn initialize(
-        max_retries: u32,
-        find_time: Duration,
-        ban_time: Duration,
-    ) {
+    pub fn initialize(max_retries: u32, find_time: Duration, ban_time: Duration) {
         // Create rate limiter instance with initialized values
         let rate_limiter = RateLimiter {
             attempts: HashMap::new(),
