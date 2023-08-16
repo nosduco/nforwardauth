@@ -48,7 +48,7 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") | (&Method::GET, "/forward") => api_forward_auth(req).await,
         (&Method::POST, "/login") => api_login(req).await,
-        (&Method::GET, "/login") => api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await,
+        (&Method::GET, "/login") => api_login_wrapper(req).await,
         (&Method::POST, "/logout") => api_logout().await,
         (&Method::GET, "/logout") => api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await,
         _ => {
@@ -213,6 +213,54 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         .status(StatusCode::UNAUTHORIZED)
         .body(full(UNAUTHORIZED))
         .unwrap())
+}
+
+// Login serve file wrapper
+async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
+    // Get token from request headers and check if cookie exists, otherwise serve login page
+    let headers = req.headers();
+    if headers.contains_key(COOKIE) {
+        // Grab cookies from headers
+        let cookies = headers[COOKIE].to_str().unwrap();
+        // Find jwt cookie (if exists)
+        for cookie in Cookie::split_parse(cookies) {
+            let cookie = cookie.unwrap();
+
+            if cookie.name() == Config::global().cookie_name {
+                // Found cookie, parse token and validate
+                let token_str = cookie.value();
+                let claims: BTreeMap<String, String> =
+                    token_str.verify_with_key(&Config::global().key).unwrap();
+                if claims["authenticated"] == "true" {
+                    // Fetch the 'r' query parameter from the request
+                    let target_url = req
+                        .uri()
+                        .query()
+                        .and_then(|query| {
+                            query
+                                .split('&')
+                                .find(|pair| pair.starts_with("r="))
+                                .and_then(|pair| pair.strip_prefix("r="))
+                        })
+                        .map(|s| s.to_string());
+
+                    if let Some(target_url) = target_url {
+                        // Target URL exists, redirect
+                        return Ok(Response::builder()
+                            .status(StatusCode::TEMPORARY_REDIRECT)
+                            .header(LOCATION, target_url)
+                            .body(full(AUTHORIZED))
+                            .unwrap());
+                    } else {
+                        // Serve logout page
+                        return api_forward_auth(req).await;
+                    }
+                }
+            }
+        }
+    }
+
+    return api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await;
 }
 
 // Logout route
