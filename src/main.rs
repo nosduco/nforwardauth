@@ -5,7 +5,7 @@ mod util;
 use crate::config::Config;
 use crate::util::{full, BoxBody, Result};
 use bytes::Buf;
-use cookie::time::{Duration, OffsetDateTime};
+use cookie::time::{Duration as CookieDuration, OffsetDateTime};
 use cookie::{Cookie, SameSite};
 use http_auth_basic::Credentials;
 use http_body_util::BodyExt;
@@ -19,6 +19,7 @@ use jwt::{SignWithKey, VerifyWithKey};
 use regex::Regex;
 use std::collections::BTreeMap;
 use std::net::{IpAddr, SocketAddr};
+use std::time::Duration;
 use tokio::fs;
 use tokio::net::TcpListener;
 use tokio::signal::unix::{signal, SignalKind};
@@ -40,6 +41,7 @@ static NOT_FOUND: &[u8] = b"Not Found";
 static UNAUTHORIZED: &[u8] = b"Unauthorized";
 static AUTHORIZED: &[u8] = b"Authorized";
 static LOGGED_OUT: &[u8] = b"Logged Out";
+static TOO_MANY_REQUESTS: &[u8] = b"Too Many Requests";
 
 // Route table
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
@@ -130,26 +132,35 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
 
 // Login route
 async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
-    // Middleware: rate limiter
+    // Get headers from request
     let headers = req.headers();
-    if headers.contains_key(FORWARDED_FOR) {
-        let x_forwarded_for = headers[FORWARDED_FOR].to_str().unwrap();
-        let source_ip = x_forwarded_for.split(',').next().unwrap_or(x_forwarded_for);
-        if let Ok(ip) = source_ip.trim().parse::<IpAddr>() {
-            // Call rate limiter
+    // Middleware - rate limiter
+    if let Some(mut rate_limiter) = middleware::RateLimiter::global() {
+        // Rate limiter is enabled, grab IP from header and check rate limit
+        if headers.contains_key(FORWARDED_FOR) {
+            let x_forwarded_for = headers[FORWARDED_FOR].to_str().unwrap();
+            let source_ip = x_forwarded_for.split(',').next().unwrap_or(x_forwarded_for);
+            if let Ok(ip) = source_ip.trim().parse::<IpAddr>() {
+                if !rate_limiter.try_login(ip) {
+                    // Rate limit exceeded, return an error response
+                    return Ok(Response::builder()
+                        .status(StatusCode::TOO_MANY_REQUESTS)
+                        .body(full(TOO_MANY_REQUESTS))
+                        .unwrap());
+                }
+            } else {
+                println!(
+                    "Warning: Failed to parse {} header from request.",
+                    FORWARDED_FOR
+                );
+            }
         } else {
             println!(
-                "Warning: Failed to parse {} header from request.",
+                "Warning: Request without {} header processed.",
                 FORWARDED_FOR
             );
         }
-    } else {
-        println!(
-            "Warning: Request without {} header processed.",
-            FORWARDED_FOR
-        );
     }
-
     // Aggregate request body
     let body = req.collect().await?.aggregate();
     // Decode JSON
@@ -168,7 +179,7 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
             claims.insert("authenticated", "true");
             claims.insert("user", user);
             let mut now = OffsetDateTime::now_utc();
-            now += Duration::days(7);
+            now += CookieDuration::days(7);
             let cookie = Cookie::build(
                 &Config::global().cookie_name,
                 claims.sign_with_key(&Config::global().key).unwrap(),
@@ -199,7 +210,7 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
 // Logout route
 async fn api_logout() -> Result<Response<BoxBody>> {
     // Build cookie in past to expire existing cookies in browser
-    let past = OffsetDateTime::now_utc() - Duration::days(1);
+    let past = OffsetDateTime::now_utc() - CookieDuration::days(1);
     let expired_cookie = Cookie::build(&Config::global().cookie_name, "")
         .domain(&Config::global().cookie_domain)
         .http_only(true)
@@ -260,6 +271,15 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Initialize config (port, token secret, auth backend url, ...)
     Config::initialize()?;
     println!("Loaded configuration.");
+
+    // Initialize rate limiter (if enabled)
+    if Config::global().rate_limiter_enabled {
+        middleware::RateLimiter::initialize(
+            Config::global().rate_limiter_max_retries,
+            Duration::from_secs(Config::global().rate_limiter_find_time.into()),
+            Duration::from_secs(Config::global().rate_limiter_ban_time.into()),
+        );
+    }
 
     // Setup signal handling
     let mut term_signal = signal(SignalKind::terminate())?;

@@ -12,6 +12,10 @@ pub struct Config {
     pub cookie_secure: bool,
     pub cookie_domain: String,
     pub cookie_name: String,
+    pub rate_limiter_enabled: bool,
+    pub rate_limiter_max_retries: u32,
+    pub rate_limiter_find_time: u32,
+    pub rate_limiter_ban_time: u32,
 }
 
 /* Config Singleton Instance and Implementation */
@@ -77,6 +81,32 @@ impl Config {
             Err(..) => "nforwardauth".to_string(),
         };
 
+        // rate_limiter_enabled: Whether rate limiter for logins is enabled or not
+        let rate_limiter_enabled: bool = match env::var("RATE_LIMITER_ENABLED") {
+            Ok(enabled) => enabled != "false",
+            Err(..) => true,
+        };
+
+        // rate_limiter_max_retries: Max number of retries within rate_limiter_find_time before ban
+        let rate_limiter_max_retries: u32 = match env::var("RATE_LIMITER_MAX_RETRIES") {
+            Ok(max_retries) => max_retries.parse::<u32>().unwrap(),
+            Err(..) => 3,
+        };
+
+        // rate_limiter_find_time: Time (seconds) to track number of retries for rate limiting
+        let rate_limiter_find_time: u32 = match env::var("RATE_LIMITER_FIND_TIME") {
+            Ok(find_time) => find_time.parse::<u32>().unwrap(),
+            Err(..) => 120,
+        };
+
+        // rate_limiter_ban_time: Time (seconds) to ban if rate_limiter_max_retries is hit inside rate_limiter_find_time
+        let rate_limiter_ban_time: u32 = match env::var("RATE_LIMITER_BAN_TIME") {
+            Ok(ban_time) => ban_time.parse::<u32>().unwrap(),
+            Err(..) => 300,
+        };
+
+        println!("using {} and {}", rate_limiter_ban_time, port);
+
         // Create config instance with initialized values
         let config = Config {
             port,
@@ -85,6 +115,10 @@ impl Config {
             cookie_secure,
             cookie_domain,
             cookie_name,
+            rate_limiter_enabled,
+            rate_limiter_max_retries,
+            rate_limiter_find_time,
+            rate_limiter_ban_time,
         };
 
         // Initialize config in instance
