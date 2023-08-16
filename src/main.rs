@@ -260,7 +260,7 @@ async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBod
         }
     }
 
-    return api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await;
+    api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await
 }
 
 // Logout route
