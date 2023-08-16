@@ -181,7 +181,7 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
     // No valid cookie/jwt found, create redirect url and return
     let mut location =
         Url::parse(format!("http://{}/login", &Config::global().auth_host).as_str())?;
-    
+
     // Set redirection location protocol based on X-Forwarded-Proto
     if headers.contains_key(FORWARDED_PROTO) {
         if let Err(_e) = location.set_scheme(headers[FORWARDED_PROTO].to_str().unwrap()) {
