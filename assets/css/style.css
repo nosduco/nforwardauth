@@ -57,7 +57,7 @@ input[type="password"]:focus {
   background-color: #e8e8e8;
 }
 
-input[type="submit"] {
+button {
   width: 100%;
   padding: 1em;
   border: none;
@@ -72,11 +72,11 @@ input[type="submit"] {
   transition: all 0.3s ease;
 }
 
-input[type="submit"]:hover {
+button:hover {
   background-color: #ffbd2f;
 }
 
-input[type="submit"]:focus {
+button:focus {
   outline: none;
 }
 
