@@ -75,10 +75,12 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
             if cookie.name() == Config::global().cookie_name {
                 // Found cookie, parse token and validate
                 let token_str = cookie.value();
-                let claims: BTreeMap<String, String> =
-                    token_str.verify_with_key(&Config::global().key).unwrap();
-                if claims["authenticated"] == "true" {
-                    return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
+                let result: core::result::Result<BTreeMap<String, String>, _> =
+                    token_str.verify_with_key(&Config::global().key);
+                if let Ok(claims) = result {
+                    if claims["authenticated"] == "true" {
+                        return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
+                    }
                 }
             }
         }
