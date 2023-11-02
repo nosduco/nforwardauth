@@ -1,13 +1,35 @@
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
 
 name: Release
 
 jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.prepare.outputs.release_created }}
+      version: ${{ steps.prepare.outputs.tag_name }}
+    steps:
+      - name: Prepare release
+        id: prepare
+        uses: google-github-actions/release-please-action@v3
+        with:
+          release-type: rust
+          package-name: nforwardauth
+          pull-request-header: Prepared Release
+          changelog-types: '[{"type":"feat","section":"Features"},{"type":"fix","section":"Bug Fixes"},{"type":"doc","section":"Documentation"},{"type":"perf","section":"Performance"},{"type":"refactor","section":"Refactor"},{"type":"test","section":"Testing"},{"type":"chore","section":"Miscellaneous Tasks"},{"type":"ci","section":"CI/CD"}]'
   build-and-publish:
     name: Build and Publish
     runs-on: ubuntu-22.04
+    needs: [prepare]
+    if: ${{ needs.prepare.outputs.release }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -23,4 +45,4 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           pull: true
-          tags: nosduco/nforwardauth:latest,nosduco/nforwardauth:v1,nosduco/nforwardauth:${{ github.ref_name }}
+          tags: nosduco/nforwardauth:latest,nosduco/nforwardauth:v1,nosduco/nforwardauth:${{ needs.prepare.outputs.version }}
