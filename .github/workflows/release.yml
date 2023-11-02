@@ -5,8 +5,8 @@ on:
 name: Release
 
 jobs:
-  build-and-release:
-    name: Build and Release
+  build-and-publish:
+    name: Build and Publish
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
