@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.1](https://github.com/nosduco/nforwardauth/compare/v1.3.0...v1.3.1) (2023-11-02)
+
+
+### Bug Fixes
+
+* handle error from jwt manipulation ([2267fcc](https://github.com/nosduco/nforwardauth/commit/2267fcc22590da41782a38c4c56e0fd9c79db086))
+* handle error from jwt manipulation ([#40](https://github.com/nosduco/nforwardauth/issues/40)) ([150a3c9](https://github.com/nosduco/nforwardauth/commit/150a3c9995935b1d14096bfeb6df2d7a78f743e1))
+
+
+### CI/CD
+
+* update release workflow to publish to dockerhub on release creation ([947601d](https://github.com/nosduco/nforwardauth/commit/947601dbb4b17207b8bd53a99060f5e6f2a5a150))
+
 ## [1.3.0](https://github.com/nosduco/nforwardauth/compare/v1.2.2...v1.3.0) (2023-11-02)
 
 
