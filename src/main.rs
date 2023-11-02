@@ -92,9 +92,8 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
 
         // Check login against passwd file
         let find_hash = get_user_hash(&credentials.user_id).await?;
-        if find_hash.is_some() {
+        if let Some(hash) = find_hash {
             // User found, verify password with hash
-            let hash = find_hash.unwrap();
             let verify = pwhash::unix::verify(&credentials.password, &hash);
             if verify {
                 // Correct login
@@ -176,9 +175,8 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // Process login and find user in passwd file
     let user = data["username"].as_str().unwrap();
     let find_hash = get_user_hash(user).await?;
-    if find_hash.is_some() {
+    if let Some(hash) = find_hash {
         // User found, verify password with hash
-        let hash = find_hash.unwrap();
         let pass = data["password"].as_str().unwrap();
         let verify = pwhash::unix::verify(pass, &hash);
         if verify {
@@ -314,8 +312,7 @@ async fn get_user_hash(user: &str) -> Result<Option<String>> {
         let pattern = format!(r"(\n|^){}:(.+)(\n|$)", user);
         let regex = Regex::new(&pattern).unwrap();
         let user_match = regex.captures(&passwd);
-        if user_match.is_some() {
-            let captures = user_match.unwrap();
+        if let Some(captures) = user_match {
             return Ok(Some(captures.get(2).map_or("", |m| m.as_str()).to_string()));
         }
     }
