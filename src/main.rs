@@ -48,7 +48,7 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") | (&Method::GET, "/forward") => api_forward_auth(req).await,
         (&Method::POST, "/login") => api_login(req).await,
-        (&Method::GET, "/login") => api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await,
+        (&Method::GET, "/login") => api_login_wrapper(req).await,
         (&Method::POST, "/logout") => api_logout().await,
         (&Method::GET, "/logout") => api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await,
         _ => {
@@ -107,11 +107,19 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
     let mut location =
         Url::parse(format!("http://{}/login", &Config::global().auth_host).as_str())?;
 
+    // Set redirection location protocol based on X-Forwarded-Proto
+    if headers.contains_key(FORWARDED_PROTO) {
+        if let Err(_e) = location.set_scheme(headers[FORWARDED_PROTO].to_str().unwrap()) {
+            println!("Error: Failed setting protocol for redirect location.");
+        }
+    }
+
     if headers.contains_key(FORWARDED_HOST)
         && headers[FORWARDED_HOST].to_str().unwrap() != Config::global().auth_host
     {
         let mut referral_url =
             Url::parse(format!("http://{}", headers[FORWARDED_HOST].to_str().unwrap()).as_str())?;
+        // Set referral protocol based on X-Forwarded-Proto
         if headers.contains_key(FORWARDED_PROTO) {
             if let Err(_e) = referral_url.set_scheme(headers[FORWARDED_PROTO].to_str().unwrap()) {
                 println!("Error: Failed setting protocol for referral url.");
@@ -187,7 +195,7 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
             .domain(&Config::global().cookie_domain)
             .http_only(true)
             .secure(Config::global().cookie_secure)
-            .same_site(SameSite::Strict)
+            .same_site(SameSite::Lax)
             .expires(now)
             .finish();
 
@@ -207,6 +215,54 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         .unwrap())
 }
 
+// Login serve file wrapper
+async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
+    // Get token from request headers and check if cookie exists, otherwise serve login page
+    let headers = req.headers();
+    if headers.contains_key(COOKIE) {
+        // Grab cookies from headers
+        let cookies = headers[COOKIE].to_str().unwrap();
+        // Find jwt cookie (if exists)
+        for cookie in Cookie::split_parse(cookies) {
+            let cookie = cookie.unwrap();
+
+            if cookie.name() == Config::global().cookie_name {
+                // Found cookie, parse token and validate
+                let token_str = cookie.value();
+                let claims: BTreeMap<String, String> =
+                    token_str.verify_with_key(&Config::global().key).unwrap();
+                if claims["authenticated"] == "true" {
+                    // Fetch the 'r' query parameter from the request
+                    let target_url = req
+                        .uri()
+                        .query()
+                        .and_then(|query| {
+                            query
+                                .split('&')
+                                .find(|pair| pair.starts_with("r="))
+                                .and_then(|pair| pair.strip_prefix("r="))
+                        })
+                        .map(|s| s.to_string());
+
+                    if let Some(target_url) = target_url {
+                        // Target URL exists, redirect
+                        return Ok(Response::builder()
+                            .status(StatusCode::TEMPORARY_REDIRECT)
+                            .header(LOCATION, target_url)
+                            .body(full(AUTHORIZED))
+                            .unwrap());
+                    } else {
+                        // Serve logout page
+                        return api_forward_auth(req).await;
+                    }
+                }
+            }
+        }
+    }
+
+    api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await
+}
+
 // Logout route
 async fn api_logout() -> Result<Response<BoxBody>> {
     // Build cookie in past to expire existing cookies in browser
@@ -215,7 +271,7 @@ async fn api_logout() -> Result<Response<BoxBody>> {
         .domain(&Config::global().cookie_domain)
         .http_only(true)
         .secure(Config::global().cookie_secure)
-        .same_site(SameSite::Strict)
+        .same_site(SameSite::Lax)
         .expires(past)
         .finish();
 

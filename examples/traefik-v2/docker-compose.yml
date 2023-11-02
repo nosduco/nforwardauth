@@ -23,9 +23,10 @@ services:
       - COOKIE_SECURE=false # Do not set cookies as secure (not recommended, and optional) (WARNING: ONLY USE IN DEV OR LAN-ONLY HOSTS)
       # - COOKIE_DOMAIN=localhost.com # Set domain for the cookies (recommended, but optional)
       # - COOKIE_NAME=nforward-auth # Set name for the cookie (optional)
-      # - RATE_LIMITER_ENABLED=false # Disable built-in rate limiter
-      # - RATE_LIMITER_MAX_RETRIES=5 # Set rate limiter to max retries of 5 over 10 seconds
-      # - RATE_LIMITER_BAN_TIME=10
+      # - RATE_LIMITER_ENABLED=true # Enable or disable the built-in rate limiter
+      # - RATE_LIMITER_MAX_RETRIES=3 # Max retries allowed within RATE_LIMITER_FIND_TIME
+      # - RATE_LIMITER_FIND_TIME=120 # Time in seconds to keep track of login attempts
+      # - RATE_LIMITER_BAN_TIME=300  # Time in seconds to ban clients after reaching RATE_LIMITER_MAX_RETRIES
       - AUTH_HOST=nforwardauth.localhost.com # (required)
       - PORT=3000
     labels:
