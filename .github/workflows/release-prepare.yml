@@ -7,10 +7,11 @@ permissions:
   contents: write
   pull-requests: write
 
-name: Prepare Release
+name: Release
 
 jobs:
-  prepare-release:
+  prepare:
+    name: Prepare
     runs-on: ubuntu-latest
     steps:
       - name: Prepare release
