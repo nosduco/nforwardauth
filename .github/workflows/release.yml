@@ -71,8 +71,8 @@ jobs:
             OS: ubuntu-latest
           - TARGET: arm-unknown-linux-musleabihf
             OS: ubuntu-latest
-          - TARGET: x86_64-apple-darwin
-            OS: macos-latest
+          # - TARGET: x86_64-apple-darwin
+          #   OS: macos-latest
     env:
       NAME: nforwardauth
       TARGET: ${{ matrix.TARGET }}
