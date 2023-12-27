@@ -133,4 +133,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          if [[ $GITHUB_REF_TYPE =~ ^tag$ ]]; then
+            TAG=$GITHUB_REF_NAME
+          else
+            TAG=$GITHUB_SHA
+          fi
           gh release upload ${{ needs.prepare.outputs.version }} ./artifacts/$NAME-$TARGET-$TAG.tar.gz
