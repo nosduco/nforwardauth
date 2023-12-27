@@ -121,11 +121,7 @@ jobs:
         run: |
           mkdir -p ./artifacts
           EXEC=$NAME
-          if [[ $GITHUB_REF_TYPE =~ ^tag$ ]]; then
-            TAG=$GITHUB_REF_NAME
-          else
-            TAG=$GITHUB_SHA
-          fi
+          TAG=${{ needs.prepare.outputs.version }}
           mv ./target/$TARGET/release/$EXEC ./$EXEC
           tar -czf ./artifacts/$NAME-$TARGET-$TAG.tar.gz $EXEC
       - name: Upload artifact to release
@@ -133,9 +129,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [[ $GITHUB_REF_TYPE =~ ^tag$ ]]; then
-            TAG=$GITHUB_REF_NAME
-          else
-            TAG=$GITHUB_SHA
-          fi
+          TAG=${{ needs.prepare.outputs.version }}
           gh release upload ${{ needs.prepare.outputs.version }} ./artifacts/$NAME-$TARGET-$TAG.tar.gz
