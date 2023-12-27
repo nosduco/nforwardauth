@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.4](https://github.com/nosduco/nforwardauth/compare/v1.3.3...v1.3.4) (2023-12-27)
+
+
+### CI/CD
+
+* use tag version instead of commit sha on binary archive names ([cc8913e](https://github.com/nosduco/nforwardauth/commit/cc8913eceb2042b80bd650080703659065e96212))
+
 ## [1.3.3](https://github.com/nosduco/nforwardauth/compare/v1.3.2...v1.3.3) (2023-12-27)
 
 
