@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3](https://github.com/nosduco/nforwardauth/compare/v1.3.2...v1.3.3) (2023-12-27)
+
+
+### CI/CD
+
+* fix binary release artifact attachments ([03ebe99](https://github.com/nosduco/nforwardauth/commit/03ebe99c8523c22d75ba673bda519bfbff685426))
+
 ## [1.3.2](https://github.com/nosduco/nforwardauth/compare/v1.3.1...v1.3.2) (2023-12-27)
 
 
