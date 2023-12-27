@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.2](https://github.com/nosduco/nforwardauth/compare/v1.3.1...v1.3.2) (2023-12-27)
+
+
+### CI/CD
+
+* add multi-build step for compiling binaries ([fdd52e8](https://github.com/nosduco/nforwardauth/commit/fdd52e8ab2474de22e4b250ee5c097b5af7561d0))
+* disable macos build when cross-compiling ([fe6178f](https://github.com/nosduco/nforwardauth/commit/fe6178f333c89adb9c7e2f186a3448346810869d))
+* remove windows from cross-compile builds ([6c2bd59](https://github.com/nosduco/nforwardauth/commit/6c2bd594119997e04704e350593cddbeaf4ff922))
+* rename build steps and configure build binaries step to trigger on release and add release artifacts ([c03b480](https://github.com/nosduco/nforwardauth/commit/c03b48090f965cc4903d0b17b0dffaac1bf733bc))
+
 ## [1.3.1](https://github.com/nosduco/nforwardauth/compare/v1.3.0...v1.3.1) (2023-11-02)
 
 
