@@ -25,8 +25,8 @@ jobs:
           package-name: nforwardauth
           pull-request-header: Prepared Release
           changelog-types: '[{"type":"feat","section":"Features"},{"type":"fix","section":"Bug Fixes"},{"type":"doc","section":"Documentation"},{"type":"perf","section":"Performance"},{"type":"refactor","section":"Refactor"},{"type":"test","section":"Testing"},{"type":"chore","section":"Miscellaneous Tasks"},{"type":"ci","section":"CI/CD"}]'
-  build-and-publish:
-    name: Build and Publish
+  build-docker:
+    name: Build Docker
     runs-on: ubuntu-22.04
     needs: [prepare]
     if: ${{ needs.prepare.outputs.release }}
@@ -46,11 +46,11 @@ jobs:
           push: true
           pull: true
           tags: nosduco/nforwardauth:latest,nosduco/nforwardauth:v1,nosduco/nforwardauth:${{ needs.prepare.outputs.version }}
-  build:
-    name: Build
+  build-binaries:
+    name: Build Binaries
     runs-on: ubuntu-22.04
     needs: [prepare]
-    # if: ${{ needs.prepare.outputs.release }}
+    if: ${{ needs.prepare.outputs.release }}
     strategy:
       fail-fast: true
       matrix:
@@ -128,9 +128,9 @@ jobs:
           fi
           mv ./target/$TARGET/release/$EXEC ./$EXEC
           tar -czf ./artifacts/$NAME-$TARGET-$TAG.tar.gz $EXEC
-      - name: Archive artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: builds
-          path: |
-            ./artifacts
+      - name: Upload artifact to release
+        if: ${{ needs.prepare.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ needs.prepare.outputs.version }} ./artifacts/$NAME-$TARGET-$TAG.tar.gz
