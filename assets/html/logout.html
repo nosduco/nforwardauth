@@ -3,32 +3,24 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unauthorized</title>
+    <title>Authorized</title>
     <link rel="icon" href="favicon.ico" sizes="48x48">
     <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
     <link rel="icon" type="image/png" href="android-chrome-192x192.png" sizes="192x192">
     <link rel="icon" type="image/png" href="android-chrome-512x512.png" sizes="512x512">
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="site.webmanifest">
-    <script src="script.js" defer></script>
+    <script src="logout.js" defer></script>
   </head>
   <body>
     <div class="container">
-      <div class="form" id="form">
+      <div class="form">
         <div class="alert">
           <p id="alert-message"></p>
         </div>
-        <h1>Login</h1>
-        <div class="form-control">
-          <label for="username">Username</label>
-          <input type="text" id="username" name="username" autocomplete="username" required autofocus>
-        </div>
-        <div class="form-control">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" autocomplete="current-password" required>
-        </div>
+        <h1>Authorized</h1>
         <div class="button-container">
-          <button id="submit">Submit</button>
+          <button id="submit">Logout</button>
         </div>
       </div>
   </body>

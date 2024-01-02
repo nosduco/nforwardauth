@@ -1,125 +1,56 @@
 mod config;
+mod middleware;
 mod util;
 
 use crate::config::Config;
 use crate::util::{full, BoxBody, Result};
 use bytes::Buf;
-use cookie::time::{Duration, OffsetDateTime};
+use cookie::time::{Duration as CookieDuration, OffsetDateTime};
 use cookie::{Cookie, SameSite};
-use hmac::{Hmac, Mac};
+use http_auth_basic::Credentials;
 use http_body_util::BodyExt;
-use hyper::header::{CONTENT_TYPE, COOKIE, LOCATION, SET_COOKIE};
+use hyper::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE, LOCATION, SET_COOKIE};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{body::Incoming as IncomingBody, Request, Response};
 use hyper::{Method, StatusCode};
+use hyper_util::rt::TokioIo;
 use jwt::{SignWithKey, VerifyWithKey};
-use once_cell::sync::OnceCell;
 use regex::Regex;
-use sha2::Sha256;
 use std::collections::BTreeMap;
-use std::env;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
+use std::time::Duration;
 use tokio::fs;
 use tokio::net::TcpListener;
+use tokio::signal::unix::{signal, SignalKind};
 use url::Url;
 
 /* Header Names */
 static FORWARDED_HOST: &str = "X-Forwarded-Host";
 static FORWARDED_PROTO: &str = "X-Forwarded-Proto";
 static FORWARDED_URI: &str = "X-Forwarded-Uri";
+static FORWARDED_FOR: &str = "X-Forwarded-For";
 
 /* File Paths */
 static INDEX_DOCUMENT: &str = "/public/index.html";
+static LOGOUT_DOCUMENT: &str = "/public/logout.html";
 static PASSWD_FILE: &str = "/passwd";
 
 /* HTTP Status Responses */
 static NOT_FOUND: &[u8] = b"Not Found";
 static UNAUTHORIZED: &[u8] = b"Unauthorized";
 static AUTHORIZED: &[u8] = b"Authorized";
-
-/* Config Singleton Instance and Implementation */
-static INSTANCE: OnceCell<Config> = OnceCell::new();
-impl Config {
-    pub fn global() -> &'static Config {
-        INSTANCE.get().expect("config is not initialized")
-    }
-
-    fn initialize() -> Result<Config> {
-        // port: Port server should bind and listen on
-        let port: u16 = match env::var("PORT") {
-            Ok(port) => port.parse::<u16>().unwrap(),
-            Err(..) => 3000,
-        };
-
-        // key: Generate key from environment variable or randomly generated secret
-        let key: Hmac<Sha256> = match env::var("TOKEN_SECRET") {
-            Ok(secret) => {
-                // Generate key from environment variable containing custom secret
-                Hmac::new_from_slice(secret.as_bytes()).unwrap()
-            }
-            Err(..) => {
-                println!("Error: missing TOKEN_SECRET environment variable");
-                std::process::exit(78);
-            }
-        };
-
-        // auth_backend_url: Grab auth backend URL from environment variable
-        let auth_host: String = match env::var("AUTH_HOST") {
-            Ok(value) => value,
-            Err(..) => {
-                println!("Error: missing AUTH_HOST environment variable");
-                std::process::exit(78);
-            }
-        };
-
-        // cookie_secure: Whether cookie secure flag should be set
-        let cookie_secure: bool = match env::var("COOKIE_SECURE") {
-            Ok(secure) => secure != "false",
-            Err(..) => true,
-        };
-
-        // cookie_domain: Domain cookie should be set for
-        let regex = Regex::new(r"[^.]*.[^.]*$").unwrap();
-        let host = regex.captures(&auth_host);
-        let cookie_domain: String = match env::var("COOKIE_DOMAIN") {
-            Ok(value) => value,
-            Err(..) => {
-                if let Some(..) = host {
-                    host.unwrap()
-                        .get(0)
-                        .map_or(auth_host.clone().as_str(), |m| m.as_str())
-                        .to_string()
-                } else {
-                    auth_host.clone()
-                }
-            }
-        };
-
-        // cookie_name: Name of cookie to set
-        let cookie_name: String = match env::var("COOKIE_NAME") {
-            Ok(value) => value,
-            Err(..) => "nforwardauth".to_string(),
-        };
-
-        // Return config instance with initialized values
-        Ok(Config {
-            port,
-            key,
-            auth_host,
-            cookie_secure,
-            cookie_domain,
-            cookie_name,
-        })
-    }
-}
+static LOGGED_OUT: &[u8] = b"Logged Out";
+static TOO_MANY_REQUESTS: &[u8] = b"Too Many Requests";
 
 // Route table
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") | (&Method::GET, "/forward") => api_forward_auth(req).await,
         (&Method::POST, "/login") => api_login(req).await,
-        (&Method::GET, "/login") => api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await,
+        (&Method::GET, "/login") => api_login_wrapper(req).await,
+        (&Method::POST, "/logout") => api_logout().await,
+        (&Method::GET, "/logout") => api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await,
         _ => {
             api_serve_file(
                 format!("/public{}", req.uri().path()).as_str(),
@@ -132,7 +63,7 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
 
 // ForwardAuth route
 async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
-    // Get token from request headers
+    // Get token from request headers and check if cookie exists
     let headers = req.headers();
     if headers.contains_key(COOKIE) {
         // Grab cookies from headers
@@ -144,14 +75,31 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
             if cookie.name() == Config::global().cookie_name {
                 // Found cookie, parse token and validate
                 let token_str = cookie.value();
-                let claims: BTreeMap<String, String> =
-                    token_str.verify_with_key(&Config::global().key).unwrap();
-                if claims["authenticated"] == "true" {
-                    return Ok(Response::builder()
-                        .status(StatusCode::OK)
-                        .body(full(AUTHORIZED))
-                        .unwrap());
+                let result: core::result::Result<BTreeMap<String, String>, _> =
+                    token_str.verify_with_key(&Config::global().key);
+                if let Ok(claims) = result {
+                    if claims["authenticated"] == "true" {
+                        return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
+                    }
                 }
+            }
+        }
+    }
+
+    // Check if basic auth exists
+    if headers.contains_key(AUTHORIZATION) {
+        // Grab basic auth header and parse credentials
+        let basic_auth = headers[AUTHORIZATION].to_str().unwrap();
+        let credentials = Credentials::from_header(basic_auth.to_string()).unwrap();
+
+        // Check login against passwd file
+        let find_hash = get_user_hash(&credentials.user_id).await?;
+        if let Some(hash) = find_hash {
+            // User found, verify password with hash
+            let verify = pwhash::unix::verify(&credentials.password, &hash);
+            if verify {
+                // Correct login
+                return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
             }
         }
     }
@@ -160,11 +108,19 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
     let mut location =
         Url::parse(format!("http://{}/login", &Config::global().auth_host).as_str())?;
 
+    // Set redirection location protocol based on X-Forwarded-Proto
+    if headers.contains_key(FORWARDED_PROTO) {
+        if let Err(_e) = location.set_scheme(headers[FORWARDED_PROTO].to_str().unwrap()) {
+            println!("Error: Failed setting protocol for redirect location.");
+        }
+    }
+
     if headers.contains_key(FORWARDED_HOST)
         && headers[FORWARDED_HOST].to_str().unwrap() != Config::global().auth_host
     {
         let mut referral_url =
             Url::parse(format!("http://{}", headers[FORWARDED_HOST].to_str().unwrap()).as_str())?;
+        // Set referral protocol based on X-Forwarded-Proto
         if headers.contains_key(FORWARDED_PROTO) {
             if let Err(_e) = referral_url.set_scheme(headers[FORWARDED_PROTO].to_str().unwrap()) {
                 println!("Error: Failed setting protocol for referral url.");
@@ -185,6 +141,35 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
 
 // Login route
 async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
+    // Get headers from request
+    let headers = req.headers();
+    // Middleware - rate limiter
+    if let Some(mut rate_limiter) = middleware::RateLimiter::global() {
+        // Rate limiter is enabled, grab IP from header and check rate limit
+        if headers.contains_key(FORWARDED_FOR) {
+            let x_forwarded_for = headers[FORWARDED_FOR].to_str().unwrap();
+            let source_ip = x_forwarded_for.split(',').next().unwrap_or(x_forwarded_for);
+            if let Ok(ip) = source_ip.trim().parse::<IpAddr>() {
+                if !rate_limiter.try_login(ip) {
+                    // Rate limit exceeded, return an error response
+                    return Ok(Response::builder()
+                        .status(StatusCode::TOO_MANY_REQUESTS)
+                        .body(full(TOO_MANY_REQUESTS))
+                        .unwrap());
+                }
+            } else {
+                println!(
+                    "Warning: Failed to parse {} header from request.",
+                    FORWARDED_FOR
+                );
+            }
+        } else {
+            println!(
+                "Warning: Request without {} header processed.",
+                FORWARDED_FOR
+            );
+        }
+    }
     // Aggregate request body
     let body = req.collect().await?.aggregate();
     // Decode JSON
@@ -192,9 +177,8 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // Process login and find user in passwd file
     let user = data["username"].as_str().unwrap();
     let find_hash = get_user_hash(user).await?;
-    if find_hash.is_some() {
+    if let Some(hash) = find_hash {
         // User found, verify password with hash
-        let hash = find_hash.unwrap();
         let pass = data["password"].as_str().unwrap();
         let verify = pwhash::unix::verify(pass, &hash);
         if verify {
@@ -203,7 +187,7 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
             claims.insert("authenticated", "true");
             claims.insert("user", user);
             let mut now = OffsetDateTime::now_utc();
-            now += Duration::days(7);
+            now += CookieDuration::days(7);
             let cookie = Cookie::build(
                 &Config::global().cookie_name,
                 claims.sign_with_key(&Config::global().key).unwrap(),
@@ -211,7 +195,7 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
             .domain(&Config::global().cookie_domain)
             .http_only(true)
             .secure(Config::global().cookie_secure)
-            .same_site(SameSite::Strict)
+            .same_site(SameSite::Lax)
             .expires(now)
             .finish();
 
@@ -228,6 +212,74 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     Ok(Response::builder()
         .status(StatusCode::UNAUTHORIZED)
         .body(full(UNAUTHORIZED))
+        .unwrap())
+}
+
+// Login serve file wrapper
+async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
+    // Get token from request headers and check if cookie exists, otherwise serve login page
+    let headers = req.headers();
+    if headers.contains_key(COOKIE) {
+        // Grab cookies from headers
+        let cookies = headers[COOKIE].to_str().unwrap();
+        // Find jwt cookie (if exists)
+        for cookie in Cookie::split_parse(cookies) {
+            let cookie = cookie.unwrap();
+
+            if cookie.name() == Config::global().cookie_name {
+                // Found cookie, parse token and validate
+                let token_str = cookie.value();
+                let claims: BTreeMap<String, String> =
+                    token_str.verify_with_key(&Config::global().key).unwrap();
+                if claims["authenticated"] == "true" {
+                    // Fetch the 'r' query parameter from the request
+                    let target_url = req
+                        .uri()
+                        .query()
+                        .and_then(|query| {
+                            query
+                                .split('&')
+                                .find(|pair| pair.starts_with("r="))
+                                .and_then(|pair| pair.strip_prefix("r="))
+                        })
+                        .map(|s| s.to_string());
+
+                    if let Some(target_url) = target_url {
+                        // Target URL exists, redirect
+                        return Ok(Response::builder()
+                            .status(StatusCode::TEMPORARY_REDIRECT)
+                            .header(LOCATION, target_url)
+                            .body(full(AUTHORIZED))
+                            .unwrap());
+                    } else {
+                        // Serve logout page
+                        return api_forward_auth(req).await;
+                    }
+                }
+            }
+        }
+    }
+
+    api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await
+}
+
+// Logout route
+async fn api_logout() -> Result<Response<BoxBody>> {
+    // Build cookie in past to expire existing cookies in browser
+    let past = OffsetDateTime::now_utc() - CookieDuration::days(1);
+    let expired_cookie = Cookie::build(&Config::global().cookie_name, "")
+        .domain(&Config::global().cookie_domain)
+        .http_only(true)
+        .secure(Config::global().cookie_secure)
+        .same_site(SameSite::Lax)
+        .expires(past)
+        .finish();
+
+    // Return OK with cookie
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(SET_COOKIE, expired_cookie.to_string())
+        .body(full(LOGGED_OUT))
         .unwrap())
 }
 
@@ -262,8 +314,7 @@ async fn get_user_hash(user: &str) -> Result<Option<String>> {
         let pattern = format!(r"(\n|^){}:(.+)(\n|$)", user);
         let regex = Regex::new(&pattern).unwrap();
         let user_match = regex.captures(&passwd);
-        if user_match.is_some() {
-            let captures = user_match.unwrap();
+        if let Some(captures) = user_match {
             return Ok(Some(captures.get(2).map_or("", |m| m.as_str()).to_string()));
         }
     }
@@ -273,29 +324,69 @@ async fn get_user_hash(user: &str) -> Result<Option<String>> {
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Initialize config (port, token secret, auth backend url, ...)
-    let config = Config::initialize().unwrap();
-    INSTANCE.set(config).unwrap();
+    Config::initialize()?;
     println!("Loaded configuration.");
+
+    // Initialize rate limiter (if enabled)
+    if Config::global().rate_limiter_enabled {
+        middleware::RateLimiter::initialize(
+            Config::global().rate_limiter_max_retries,
+            Duration::from_secs(Config::global().rate_limiter_find_time.into()),
+            Duration::from_secs(Config::global().rate_limiter_ban_time.into()),
+        );
+    }
+
+    // Setup signal handling
+    let mut term_signal = signal(SignalKind::terminate())?;
+    let mut int_signal = signal(SignalKind::interrupt())?;
 
     // Create TcpListener and bind
     let addr = SocketAddr::from(([0, 0, 0, 0], Config::global().port));
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on http://{}", addr);
 
-    // Start loop to continuously accept incoming connections
-    loop {
-        let (stream, _) = listener.accept().await?;
+    // Create a future to handle server startup
+    let server = async {
+        // Start loop to continuously accept incoming connections
+        loop {
+            match listener.accept().await {
+                Ok((stream, _)) => {
+                    let io = TokioIo::new(stream);
 
-        // Spawn a tokio task to serve multiple connections concurrently
-        tokio::task::spawn(async move {
-            // Finally, bind the incoming connection to our index service
-            if let Err(err) = http1::Builder::new()
-                // Convert function to service
-                .serve_connection(stream, service_fn(api))
-                .await
-            {
-                println!("Error: Failed serving connection: {:?}", err);
-            }
-        });
+                    // Spawn a tokio task to serve multiple connections concurrently
+                    tokio::task::spawn(async move {
+                        // Finally, bind the incoming connection to our index service
+                        if let Err(err) = http1::Builder::new()
+                            // Convert function to service
+                            .serve_connection(io, service_fn(api))
+                            .await
+                        {
+                            println!("Error: Failed serving connection: {:?}", err);
+                        }
+                    });
+                }
+                Err(e) => {
+                    println!("Error accepting connection: {:?}", e);
+                    continue;
+                }
+            };
+        }
+    };
+
+    // Create a future to handle signals
+    let shutdown_signal = async {
+        tokio::select! {
+            _ = term_signal.recv() => {},
+            _ = int_signal.recv() => {},
+        }
+    };
+
+    // Run server with signal handling
+    tokio::select! {
+        _ = server => {},
+        _ = shutdown_signal => {
+            println!("Shutdown signal received, shutting down...")
+        },
     }
+    Ok(())
 }

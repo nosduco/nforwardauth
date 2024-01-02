@@ -1,12 +1,13 @@
 [package]
 name = "nforwardauth"
-version = "0.1.0"
+version = "1.3.3"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-hyper = { version = "1.0.0-rc.3", features = ["full"] }
-tokio = { version = "1", features = ["full"] }
+hyper = { version = "1.1.0", features = ["full"] }
+tokio = { version = "1", features = ["full", "signal"] }
+hyper-util = { version = "0.1.2", features = ["full"] }
 url = "2.3.1"
 http-body-util = "0.1.0-rc.2" 
 serde_json = "1.0"
@@ -20,3 +21,4 @@ mime_guess = "2.0.4"
 pwhash = "1.0.0"
 regex = "1.7.1"
 simple_logger = "4.1.0"
+http-auth-basic = "0.3.3"

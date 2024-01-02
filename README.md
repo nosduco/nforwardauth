@@ -24,6 +24,8 @@ When you visit a route/host that is protected by nforwardauth, the server will f
 
 nforwardauth uses a `passwd` file to store valid credentials. Currently, it only supports username and password combinations (similar to that of HTTP basic auth).
 
+***Note: You can still pass basic auth in the URL and skip the login page. This compatibility exists for applications like nzb360.***
+
 ## Getting started
 
 #### How the `passwd` file works
@@ -144,6 +146,10 @@ Look at the `examples` directory in the repository or the below details section 
 | `COOKIE_DOMAIN` | Set the domain for the cookies, allow auth on sites beyond the root domain | string | Inferred by base url of `AUTH_HOST` | `mydomain.com`
 | `COOKIE_NAME` | Set name for the cookies. Helpful if running multiple instances to prevent collision | string | `nforwardauth` | `auth-token-1`
 | `PORT` | Set port to litsen on | number | `3000` | `80`
+| `RATE_LIMITER_ENABLED` | Enable or disable the built-in rate limiter | boolean | `true` | `false`
+| `RATE_LIMITER_MAX_RETRIES` | Max retries allowed within `RATE_LIMITER_FIND_TIME` | integer | `3` | `5`
+| `RATE_LIMITER_FIND_TIME` | Time in seconds to keep track of login attempts | integer | `120` | `60`
+| `RATE_LIMITER_BAN_TIME` | Time in seconds to ban clients after reaching `RATE_LIMITER_MAX_RETRIES` | integer | `300` | `600`
 
 ## Roadmap
 

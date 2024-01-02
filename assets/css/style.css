@@ -1,6 +1,7 @@
 body {
-  font-family: 'Open Sans', sans-serif;
+  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif;
   background-color: #f1f1f1;
+  margin: 0px;
 }
 
 .container {
@@ -43,7 +44,7 @@ input[type="text"],
 input[type="password"] {
   width: 100%;
   padding: 0.8em;
-  border: none;
+  border: 1px solid rgba(80, 80, 80, 0.4);
   background-color: #f2f2f2;
   border-radius: 5px;
   font-size: 1.1em;
@@ -62,7 +63,8 @@ button {
   border: none;
   border-radius: 5px;
   font-size: 1.1em;
-  background-color: #fda50f;
+  font-weight: 600;
+  background-color: #ffa100;
   color: white;
   text-transform: uppercase;
   letter-spacing: 1px;
