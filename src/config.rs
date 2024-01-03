@@ -105,8 +105,6 @@ impl Config {
             Err(..) => 300,
         };
 
-        println!("using {} and {}", rate_limiter_ban_time, port);
-
         // Create config instance with initialized values
         let config = Config {
             port,

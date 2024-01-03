@@ -46,7 +46,8 @@ static TOO_MANY_REQUESTS: &[u8] = b"Too Many Requests";
 // Route table
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
     match (req.method(), req.uri().path()) {
-        (&Method::GET, "/") | (&Method::GET, "/forward") => api_forward_auth(req).await,
+        (&Method::GET, "/") | (&Method::GET, "/forward") => api_forward_auth(req, None).await,
+        (&Method::GET, "/nginx") => api_forward_auth(req, Some(StatusCode::UNAUTHORIZED)).await,
         (&Method::POST, "/login") => api_login(req).await,
         (&Method::GET, "/login") => api_login_wrapper(req).await,
         (&Method::POST, "/logout") => api_logout().await,
@@ -62,7 +63,10 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
 }
 
 // ForwardAuth route
-async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
+async fn api_forward_auth(
+    req: Request<IncomingBody>,
+    reject_status_code: Option<StatusCode>,
+) -> Result<Response<BoxBody>> {
     // Get token from request headers and check if cookie exists
     let headers = req.headers();
     if headers.contains_key(COOKIE) {
@@ -132,8 +136,9 @@ async fn api_forward_auth(req: Request<IncomingBody>) -> Result<Response<BoxBody
         location.set_query(Some(format!("r={}", referral_url).as_str()));
     }
 
+    let res_status_code = reject_status_code.unwrap_or(StatusCode::TEMPORARY_REDIRECT);
     Ok(Response::builder()
-        .status(StatusCode::TEMPORARY_REDIRECT)
+        .status(res_status_code)
         .header(LOCATION, location.to_string())
         .body(full(UNAUTHORIZED))
         .unwrap())
@@ -253,7 +258,7 @@ async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBod
                             .unwrap());
                     } else {
                         // Serve logout page
-                        return api_forward_auth(req).await;
+                        return api_forward_auth(req, None).await;
                     }
                 }
             }
