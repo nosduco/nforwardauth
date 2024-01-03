@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/nosduco/nforwardauth/compare/v1.3.4...v1.4.0) (2024-01-03)
+
+
+### Features
+
+* add nginx forward auth route for nginx support ([0e0a0d8](https://github.com/nosduco/nforwardauth/commit/0e0a0d8813cd1a6483493cb2b48e21eb1d3ffb98))
+
+
+### Miscellaneous Tasks
+
+* remove unnecessary print statement ([2ddba9a](https://github.com/nosduco/nforwardauth/commit/2ddba9a29f4acba764fb536c1817992d50001362))
+
 ## [1.3.4](https://github.com/nosduco/nforwardauth/compare/v1.3.3...v1.3.4) (2023-12-27)
 
 
