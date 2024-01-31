@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/nosduco/nforwardauth/compare/v1.4.0...v1.4.1) (2024-01-31)
+
+
+### Bug Fixes
+
+* **deps:** bump actions/cache from 3 to 4 ([67fa4d5](https://github.com/nosduco/nforwardauth/commit/67fa4d597fa91ad816fa02fd81a89c4790b3f743))
+
 ## [1.4.0](https://github.com/nosduco/nforwardauth/compare/v1.3.4...v1.4.0) (2024-01-03)
 
 
