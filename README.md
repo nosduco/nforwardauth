@@ -3,6 +3,7 @@
 [![Actions status](https://github.com/nosduco/nforwardauth/workflows/CI/badge.svg)](https://github.com/nosduco/nforwardauth/actions)
 [![Docker Image Size](https://img.shields.io/docker/image-size/nosduco/nforwardauth)](https://hub.docker.com/r/nosduco/nforwardauth)
 [![Docker Image Version](https://img.shields.io/docker/v/nosduco/nforwardauth?sort=semver)](https://hub.docker.com/r/nosduco/nforwardauth)
+ ![Docker Pulls](https://img.shields.io/docker/pulls/nosduco/nforwardauth)
 
 nforwardauth is an extremely lightweight, blazing fast forward auth service that lets you use a single authentication middleware for all your sites. It is intended for use with reverse proxies like [Traefik](https://github.com/traefik/traefik), [Caddy](https://github.com/caddyserver/caddy), [nginx](https://nginx.com), and others to allow/deny access via an auth wall.
 
@@ -42,6 +43,7 @@ echo "test:$(mkpasswd -m sha-512 test)" >> /path/to/passwd
 The `passwd` file should contain one line per use in the format `username:hased_password`.
 
 When you run the nforwardauth container, you should mount the `passwd` file as a volume with the `-v` option when using the command line, like this:
+
 ```bash
 docker run -p 3000:3000 \
   -e TOKEN_SECRET=example-secret-123 \
@@ -52,7 +54,7 @@ docker run -p 3000:3000 \
 
 With your `passwd` file mounted, nforwardauth will use it to authenticate users when they access sites with the forwardauth middleware. You will only need to login once to access all sites behind the middleware.
 
-#### Simple configuration:
+#### Simple configuration
 
 Here is a very simple configuration using Traefik v2 and protecting a simple `whoami` container behind the forwardauth middleware.
 
@@ -86,6 +88,7 @@ services:
       - "traefik.http.routers.whoami.rule=Host(`whoami.yourdomain.com`)"
       - "traefik.http.routers.whoami.middlewares=nforwardauth"
 ```
+
 In the example, if you navigate to `whoami.yourdomain.com` you will be redirected to the `nforwardauth` login page. Once you sign in with valid credentials, you will be redirected back to `whoami.yourdomain.com` and subsequent visits to the site will not require a login.
 
 Look at the `examples` directory in the repository or the below details section for more examples
@@ -93,7 +96,7 @@ Look at the `examples` directory in the repository or the below details section 
 <details>
   <summary>For more advanced scenarios and configurations</summary>
 
-  #### Advanced configuration
+#### Advanced configuration
   
   Here is an example similar to the above above to support HTTP by using the available configuration properties
 
@@ -172,4 +175,3 @@ If you find a bug or have a suggestion for how to improve nforwardauth or additi
 ## License
 
 nforwardauth is released under the MIT license. please see the [LICENSE](https://giuthub.com/nosduco/nforwardauth/blob/main/license.md) file for details.
-
