@@ -15,7 +15,7 @@ body {
   height: 100vh;
 }
 
-.form {
+.login-mask {
   background-color: #fff;
   padding: 2em;
   border-radius: 5px;
@@ -28,7 +28,7 @@ h1 {
   margin-bottom: 1em;
 }
 
-.form-control {
+.login-mask-control {
   margin-bottom: 1em;
   display: flex;
   flex-direction: column;
