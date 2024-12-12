@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.1](https://github.com/nosduco/nforwardauth/compare/v1.4.0...v1.4.1) (2024-12-12)
+
+
+### Bug Fixes
+
+* crash after changing TOKEN_SECRET [#55](https://github.com/nosduco/nforwardauth/issues/55) ([23c17b7](https://github.com/nosduco/nforwardauth/commit/23c17b7856ac7c5c55ea1e0ef5a84f86dbb3b053))
+* **deps:** bump actions/cache from 3 to 4 ([67fa4d5](https://github.com/nosduco/nforwardauth/commit/67fa4d597fa91ad816fa02fd81a89c4790b3f743))
+* **deps:** bump docker/build-push-action from 5 to 6 ([3f923c0](https://github.com/nosduco/nforwardauth/commit/3f923c046faf7e47f200829198b0f48208cfbfd2))
+
 ## [1.4.0](https://github.com/nosduco/nforwardauth/compare/v1.3.4...v1.4.0) (2024-01-03)
 
 
