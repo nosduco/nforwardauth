@@ -234,31 +234,34 @@ async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBod
             if cookie.name() == Config::global().cookie_name {
                 // Found cookie, parse token and validate
                 let token_str = cookie.value();
-                let claims: BTreeMap<String, String> =
-                    token_str.verify_with_key(&Config::global().key).unwrap();
-                if claims["authenticated"] == "true" {
-                    // Fetch the 'r' query parameter from the request
-                    let target_url = req
-                        .uri()
-                        .query()
-                        .and_then(|query| {
-                            query
-                                .split('&')
-                                .find(|pair| pair.starts_with("r="))
-                                .and_then(|pair| pair.strip_prefix("r="))
-                        })
-                        .map(|s| s.to_string());
+                let result: core::result::Result<BTreeMap<String, String>, _> =
+                    token_str.verify_with_key(&Config::global().key);
 
-                    if let Some(target_url) = target_url {
-                        // Target URL exists, redirect
-                        return Ok(Response::builder()
-                            .status(StatusCode::TEMPORARY_REDIRECT)
-                            .header(LOCATION, target_url)
-                            .body(full(AUTHORIZED))
-                            .unwrap());
-                    } else {
-                        // Serve logout page
-                        return api_forward_auth(req, None).await;
+                if let Ok(claims) = result {
+                    if claims["authenticated"] == "true" {
+                        // Fetch the 'r' query parameter from the request
+                        let target_url = req
+                            .uri()
+                            .query()
+                            .and_then(|query| {
+                                query
+                                    .split('&')
+                                    .find(|pair| pair.starts_with("r="))
+                                    .and_then(|pair| pair.strip_prefix("r="))
+                            })
+                            .map(|s| s.to_string());
+
+                        if let Some(target_url) = target_url {
+                            // Target URL exists, redirect
+                            return Ok(Response::builder()
+                                .status(StatusCode::TEMPORARY_REDIRECT)
+                                .header(LOCATION, target_url)
+                                .body(full(AUTHORIZED))
+                                .unwrap());
+                        } else {
+                            // Serve logout page
+                            return api_forward_auth(req, None).await;
+                        }
                     }
                 }
             }
