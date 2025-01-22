@@ -291,8 +291,31 @@ async fn api_logout() -> Result<Response<BoxBody>> {
         .unwrap())
 }
 
+fn is_safe_path(path: &str) -> bool {
+    // Normalize path by removing duplicate slashes
+    let normalized = path.split('/')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>();
+
+    // Special cases for known good files
+    if path == INDEX_DOCUMENT || path == LOGOUT_DOCUMENT {
+        return true;
+    }
+
+    // All other paths must start with /public and not contain ..
+    normalized.first() == Some(&"public") && 
+    !normalized.contains(&"..")
+}
+
 // Serve file route
 async fn api_serve_file(filename: &str, status_code: StatusCode) -> Result<Response<BoxBody>> {
+    if !is_safe_path(filename) {
+        return Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(full(NOT_FOUND))
+            .unwrap());
+    }
+
     if let Ok(contents) = tokio::fs::read(filename).await {
         // Get mimetype of file
         let mimetype = mime_guess::from_path(filename);
