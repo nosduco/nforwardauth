@@ -293,7 +293,8 @@ async fn api_logout() -> Result<Response<BoxBody>> {
 
 fn is_safe_path(path: &str) -> bool {
     // Normalize path by removing duplicate slashes
-    let normalized = path.split('/')
+    let normalized = path
+        .split('/')
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>();
 
@@ -303,8 +304,7 @@ fn is_safe_path(path: &str) -> bool {
     }
 
     // All other paths must start with /public and not contain ..
-    normalized.first() == Some(&"public") && 
-    !normalized.contains(&"..")
+    normalized.first() == Some(&"public") && !normalized.contains(&"..")
 }
 
 // Serve file route
