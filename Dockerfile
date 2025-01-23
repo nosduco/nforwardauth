@@ -1,5 +1,5 @@
 # STAGE: Build
-FROM rust:1-alpine3.18 as builder
+FROM rust:1-alpine3.18 AS builder
 WORKDIR /build
 
 # Install alpine deps
@@ -14,13 +14,13 @@ COPY ./ ./
 
 # Download dependencies and compile (with layer caching)
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/build/target \
-    cargo build --release && \
-    cargo strip && \
-    mv /build/target/release/nforwardauth /build
+  --mount=type=cache,target=/build/target \
+  cargo build --release && \
+  cargo strip && \
+  mv /build/target/release/nforwardauth /build
 
 # STAGE: Minify
-FROM node:19.8.1 as minifier
+FROM node:19.8.1 AS minifier
 WORKDIR /build
 
 # Install CSS minifier (lightningcss), JS minifier (uglify-js), and HTML minifier (html-minifier)
@@ -36,7 +36,7 @@ RUN npx lightningcss --minify --bundle --targets '>= 0.25%' ./assets/css/style.c
 
 # Minify JS
 RUN npx uglifyjs --compress --mangle -o ./script.js -- ./assets/js/script.js  \
-    && npx uglifyjs --compress --mangle -o ./logout.js -- ./assets/js/logout.js 
+  && npx uglifyjs --compress --mangle -o ./logout.js -- ./assets/js/logout.js 
 
 # Minify HTML
 RUN npx html-minifier --collapse-whitespace --remove-comments --remove-original-tags --remove-rundundant-attributes --remove-script-type-attributes --remove-tag-whitespace --use-short-doctype -o ./index.html ./assets/html/index.html \
