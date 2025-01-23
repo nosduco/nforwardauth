@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.2](https://github.com/nosduco/nforwardauth/compare/v1.4.1...v1.4.2) (2025-01-23)
+
+
+### Bug Fixes
+
+* prevent path traversal in file serving ([#56](https://github.com/nosduco/nforwardauth/issues/56)) ([5f8ccf6](https://github.com/nosduco/nforwardauth/commit/5f8ccf60366b79983cab90cdc37b1205f5eddeb4))
+
+
+### Refactor
+
+* dockerfile syntax ([118ae08](https://github.com/nosduco/nforwardauth/commit/118ae082ee1cd1825bf824157fc854a7fda37442))
+
 ## [1.4.1](https://github.com/nosduco/nforwardauth/compare/v1.4.0...v1.4.1) (2024-12-12)
 
 
