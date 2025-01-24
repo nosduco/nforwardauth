@@ -3,7 +3,7 @@
 [![Actions status](https://github.com/nosduco/nforwardauth/workflows/CI/badge.svg)](https://github.com/nosduco/nforwardauth/actions)
 [![Docker Image Size](https://img.shields.io/docker/image-size/nosduco/nforwardauth)](https://hub.docker.com/r/nosduco/nforwardauth)
 [![Docker Image Version](https://img.shields.io/docker/v/nosduco/nforwardauth?sort=semver)](https://hub.docker.com/r/nosduco/nforwardauth)
- ![Docker Pulls](https://img.shields.io/docker/pulls/nosduco/nforwardauth)
+[![Docker Pulls](https://img.shields.io/docker/pulls/nosduco/nforwardauth)](https://hub.docker.com/r/nosduco/nforwardauth)
 
 nforwardauth is an extremely lightweight, blazing fast forward auth service that lets you use a single authentication middleware for all your sites. It is intended for use with reverse proxies like [Traefik](https://github.com/traefik/traefik), [Caddy](https://github.com/caddyserver/caddy), [nginx](https://nginx.com), and others to allow/deny access via an auth wall.
 
@@ -141,6 +141,7 @@ Look at the `examples` directory in the repository or the below details section 
 #### Available Evironment Variables
 
 ***bold** variables are required*
+
 | Variable | Description | Type | Default | Example |
 | ----------- | ----------- | ----------- | ----------- | ----------- |
 | **`AUTH_HOST`** | **URL where nforwardauth is accessible** | **string** | **N/A** | **`nforwardauth.yourdomain.com`**
