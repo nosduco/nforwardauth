@@ -16,9 +16,11 @@ const displayAlert = (msg, variant) => {
   }, 10);
 };
 
-const handleError = () => {
+const handleError = (err) => {
   // Unexpected error occurred, show alert
   displayAlert("Unexpected error occurred.", "error");
+  console.log("Error occurred", err);
+  setFieldsDisabled(false);
 };
 
 const handleResponse = (res) => {
@@ -47,16 +49,13 @@ const handleResponse = (res) => {
 };
 
 // Login function
-const login = () => {
+const login = (event) => {
+  // override default form behaviour
+  event.preventDefault();
+
   // Get form values
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
-
-  // Validation
-  if (username == "" || password == "") {
-    alert("Please make sure all fields are filled.");
-    return;
-  }
 
   // Create data object to send
   const data = {
@@ -84,17 +83,6 @@ const setFieldsDisabled = (disabled) => {
   document.getElementById("submit").disabled = disabled;
 };
 
-// Configure submit button click to trigger login
-const submitButton = document.getElementById("submit");
-submitButton.onclick = login;
-
-// Configure ENTER key-press to trigger login
-const form = document.getElementById("form");
-form.addEventListener('keydown', (e) => {
-  // Listen to 'keydown' event and check if Enter key
-  if (e.key === 'Enter') {
-    // Prevent default and trigger login
-    e.preventDefault();
-    login();
-  }
-});
+// Configure form to trigger login
+var form = document.querySelector("form");
+form.onsubmit = login;
