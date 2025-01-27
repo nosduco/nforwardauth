@@ -32,9 +32,9 @@ static FORWARDED_URI: &str = "X-Forwarded-Uri";
 static FORWARDED_FOR: &str = "X-Forwarded-For";
 
 /* File Paths */
-static INDEX_DOCUMENT: &str = "/public/index.html";
-static LOGOUT_DOCUMENT: &str = "/public/logout.html";
-static PASSWD_FILE: &str = "/passwd";
+static INDEX_DOCUMENT: &str = "/opt/nforwardauth/public/index.html";
+static LOGOUT_DOCUMENT: &str = "/opt/nforwardauth/public/logout.html";
+static PASSWD_FILE: &str = "/opt/nforwardauth/passwd";
 
 /* HTTP Status Responses */
 static NOT_FOUND: &[u8] = b"Not Found";
@@ -54,7 +54,7 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
         (&Method::GET, "/logout") => api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await,
         _ => {
             api_serve_file(
-                format!("/public{}", req.uri().path()).as_str(),
+                format!("/opt/nforwardauth/public{}", req.uri().path()).as_str(),
                 StatusCode::OK,
             )
             .await
