@@ -36,7 +36,7 @@ nforwardauth uses a `passwd` file to store usernames and hashed passwords for au
 Here's an example of how to create an initial `passwd` file with a single user named `test` and the password `test`. We'll use the `mkpasswd` command to generate a sha-512 hashed version of the password and echo the username and hashed password into the `passwd` file.
 
 ```bash
-echo "test:$(mkpasswd -m sha-512 test)" >> /path/to/passwd
+echo "test:$(openssl passwd -6 test)" >> /path/to/passwd
 
 ```
 
