@@ -38,6 +38,11 @@ const handleResponse = (res) => {
       displayAlert("Incorrect credentials.", "error");
       setFieldsDisabled(false);
       break;
+    case 429:
+      // Rate Limiter hit
+      displayAlert("Too many retries. Try again later", "error");
+      setFieldsDisabled(false);
+      break;
     default:
       // Unexpected status code
       displayAlert("Unexpected response from server.", "error");
@@ -54,7 +59,7 @@ const login = () => {
 
   // Validation
   if (username == "" || password == "") {
-    alert("Please make sure all fields are filled.");
+    displayAlert("Please make sure all fields are filled.", "error");
     return;
   }
 
