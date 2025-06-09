@@ -29,6 +29,7 @@ static FORWARDED_HOST: &str = "X-Forwarded-Host";
 static FORWARDED_PROTO: &str = "X-Forwarded-Proto";
 static FORWARDED_URI: &str = "X-Forwarded-Uri";
 static FORWARDED_FOR: &str = "X-Forwarded-For";
+static FORWARDED_USER: &str = "X-Forwarded-User";
 
 /* File Paths */
 static INDEX_DOCUMENT: &str = "/public/index.html";
@@ -91,15 +92,22 @@ async fn api_forward_auth(
                     token_str.verify_with_key(&Config::global().key);
                 if let Ok(claims) = result {
                     if claims["authenticated"] == "true" {
-                        let username = claims.get("user").cloned().unwrap_or_default();
-                        if is_forwarded { //Set X-Forwarded-User on forwarded request, dont send Logout page on forward
-                            return Ok(Response::builder()
-                                .status(StatusCode::OK)
-                                .header("X-Forwarded-User", username)
+                        //Successful cookie pass
+                        let user = claims.get("user").cloned().unwrap_or_default();
+                        if is_forwarded {
+                            // simple AUTHORIZED response on forward
+                            let mut response = Response::builder()
+                                .status(StatusCode::OK);
+                            // Pass X-Forwarded-User if configured
+                            if Config::global().pass_user_header {response = response
+                                .header(FORWARDED_USER, user);
+                            }
+                            return Ok(response
                                 .body(full(AUTHORIZED))
                                 .unwrap());
                         } else {
-                        return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
+                            // offer logout-page to authorized users on direct entry through auth_host
+                            return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
                         }
                     }
                 }
@@ -107,8 +115,8 @@ async fn api_forward_auth(
         }
     }
 
-    // Check if basic auth exists
-    if headers.contains_key(AUTHORIZATION) {
+    // Check if basic auth exists, only if cookie failed and for forwarded traffic
+    if headers.contains_key(AUTHORIZATION) && is_forwarded {
 
         // check ratelimiter ban
         if let Some(resp) = check_rate_limit(&headers) {
@@ -119,19 +127,24 @@ async fn api_forward_auth(
         let basic_auth = headers[AUTHORIZATION].to_str().unwrap();
         let credentials = Credentials::from_header(basic_auth.to_string()).unwrap();
 
-        // can't use cookie, Check login against passwd file
         let verify = authenticate_user(&credentials.user_id,&credentials.password,).await?;
-            if verify && is_forwarded { // allow basic auth only for forwarded traffic, not for main login page
-                // Correct login
-                return Ok(Response::builder()
-                .status(StatusCode::OK)
-                .header("X-Forwarded-User", &credentials.user_id)
+        let user = &credentials.user_id;
+        // basic auth only accepted for forwarded traffic, not for main login page
+        if verify {
+            //Successful basic auth pass: simple AUTHORIZED response on forward
+            let mut response = Response::builder()
+                .status(StatusCode::OK);
+            // Pass X-Forwarded-User if configured
+            if Config::global().pass_user_header {response = response
+                .header(FORWARDED_USER, user);
+            }
+            return Ok(response
                 .body(full(AUTHORIZED))
-                .unwrap());
+                .unwrap());                    
         }
         
         // Incorrect login (via basic auth)
-// Failed attempt, send to ratelimiter
+        // Failed attempt, send to ratelimiter
         println!("Info: Failed Basic Auth login for:{}",&credentials.user_id);
         record_failed_login(&headers);
     }
