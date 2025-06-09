@@ -69,6 +69,15 @@ async fn api_forward_auth(
 ) -> Result<Response<BoxBody>> {
     // Get token from request headers and check if cookie exists
     let headers = req.headers();
+// check validity of FORWARDED_HOST
+    let forwarded_host = headers
+    .get(FORWARDED_HOST)
+    .and_then(|v| v.to_str().ok());
+    // check if traffic is forwarded
+    let is_forwarded = forwarded_host
+    .map(|host| host != Config::global().auth_host)
+    .unwrap_or(false);
+
     if headers.contains_key(COOKIE) {
         // Grab cookies from headers
         let cookies = headers[COOKIE].to_str().unwrap();
@@ -83,7 +92,16 @@ async fn api_forward_auth(
                     token_str.verify_with_key(&Config::global().key);
                 if let Ok(claims) = result {
                     if claims["authenticated"] == "true" {
+                        let username = claims.get("user").cloned().unwrap_or_default();
+                        if is_forwarded { //Set X-Forwarded-User on forwarded request, dont send Logout page on forward
+                            return Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header("X-Forwarded-User", username)
+                                .body(full(AUTHORIZED))
+                                .unwrap());
+                        } else {
                         return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
+                        }
                     }
                 }
             }
@@ -118,10 +136,8 @@ async fn api_forward_auth(
             println!("Error: Failed setting protocol for redirect location.");
         }
     }
-
-    if headers.contains_key(FORWARDED_HOST)
-        && headers[FORWARDED_HOST].to_str().unwrap() != Config::global().auth_host
-    {
+// Set redirection URI for redirection on login
+    if is_forwarded {
         let mut referral_url =
             Url::parse(format!("http://{}", headers[FORWARDED_HOST].to_str().unwrap()).as_str())?;
         // Set referral protocol based on X-Forwarded-Proto
@@ -252,7 +268,7 @@ async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBod
                             .map(|s| s.to_string());
 
                         if let Some(target_url) = target_url {
-                            // Target URL exists, redirect
+                            // Target URL exists, redirect, no X-Forwarded-User header needed, as forwarded request is coming -after- redirect
                             return Ok(Response::builder()
                                 .status(StatusCode::TEMPORARY_REDIRECT)
                                 .header(LOCATION, target_url)
