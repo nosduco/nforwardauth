@@ -16,7 +16,6 @@ use hyper::{body::Incoming as IncomingBody, Request, Response};
 use hyper::{Method, StatusCode};
 use hyper_util::rt::TokioIo;
 use jwt::{SignWithKey, VerifyWithKey};
-use regex::Regex;
 use std::collections::BTreeMap;
 use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
@@ -114,16 +113,19 @@ async fn api_forward_auth(
         let basic_auth = headers[AUTHORIZATION].to_str().unwrap();
         let credentials = Credentials::from_header(basic_auth.to_string()).unwrap();
 
-        // Check login against passwd file
-        let find_hash = get_user_hash(&credentials.user_id).await?;
-        if let Some(hash) = find_hash {
-            // User found, verify password with hash
-            let verify = pwhash::unix::verify(&credentials.password, &hash);
-            if verify {
+        // can't use cookie, Check login against passwd file
+        let verify = authenticate_user(&credentials.user_id,&credentials.password,).await?;
+            if verify && is_forwarded { // allow basic auth only for forwarded traffic, not for main login page
                 // Correct login
-                return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
-            }
+                return Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header("X-Forwarded-User", &credentials.user_id)
+                .body(full(AUTHORIZED))
+                .unwrap());
         }
+        
+        // Incorrect login (via basic auth)
+
     }
 
     // No valid cookie/jwt found, create redirect url and return
@@ -197,36 +199,33 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     let data: serde_json::Value = serde_json::from_reader(body.reader())?;
     // Process login and find user in passwd file
     let user = data["username"].as_str().unwrap();
-    let find_hash = get_user_hash(user).await?;
-    if let Some(hash) = find_hash {
-        // User found, verify password with hash
-        let pass = data["password"].as_str().unwrap();
-        let verify = pwhash::unix::verify(pass, &hash);
-        if verify {
-            // Correct login, generate claims and token
-            let mut claims = BTreeMap::new();
-            claims.insert("authenticated", "true");
-            claims.insert("user", user);
-            let mut now = OffsetDateTime::now_utc();
-            now += CookieDuration::days(7);
-            let cookie = Cookie::build(
-                &Config::global().cookie_name,
-                claims.sign_with_key(&Config::global().key).unwrap(),
-            )
-            .domain(&Config::global().cookie_domain)
-            .http_only(true)
-            .secure(Config::global().cookie_secure)
-            .same_site(SameSite::Lax)
-            .expires(now)
-            .finish();
+    let pass = data["password"].as_str().unwrap();
+    // check credentials against passwd
+    let verify = authenticate_user(user,pass).await?;
+    if verify {
+        // Correct login, generate claims and token
+        let mut claims = BTreeMap::new();
+        claims.insert("authenticated", "true");
+        claims.insert("user", user);
+        let mut now = OffsetDateTime::now_utc();
+        now += CookieDuration::days(7);
+        let cookie = Cookie::build(
+            &Config::global().cookie_name,
+            claims.sign_with_key(&Config::global().key).unwrap(),
+        )
+        .domain(&Config::global().cookie_domain)
+        .http_only(true)
+        .secure(Config::global().cookie_secure)
+        .same_site(SameSite::Lax)
+        .expires(now)
+        .finish();
 
-            // Return OK with cookie
-            return Ok(Response::builder()
-                .status(StatusCode::OK)
-                .header(SET_COOKIE, cookie.to_string())
-                .body(full(AUTHORIZED))
-                .unwrap());
-        }
+        // Return OK with cookie
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(SET_COOKIE, cookie.to_string())
+            .body(full(AUTHORIZED))
+            .unwrap());
     }
 
     // Incorrect login, respond with unauthorized
@@ -356,16 +355,18 @@ async fn api_serve_file(filename: &str, status_code: StatusCode) -> Result<Respo
         .unwrap())
 }
 
-async fn get_user_hash(user: &str) -> Result<Option<String>> {
+// check full credentials agains passwd
+async fn authenticate_user(user: &str, password: &str) -> Result<bool> {
     if let Ok(passwd) = fs::read_to_string(PASSWD_FILE).await {
-        let pattern = format!(r"(\n|^){}:(.+)(\n|$)", user);
-        let regex = Regex::new(&pattern).unwrap();
-        let user_match = regex.captures(&passwd);
-        if let Some(captures) = user_match {
-            return Ok(Some(captures.get(2).map_or("", |m| m.as_str()).to_string()));
+        for line in passwd.lines() {
+            if let Some((stored_user, stored_hash)) = line.split_once(":") {
+                if stored_user == user && pwhash::unix::verify(password, stored_hash) {
+                    return Ok(true);
+                }
+            }
         }
     }
-    Ok(None)
+    Ok(false)
 }
 
 #[tokio::main]
