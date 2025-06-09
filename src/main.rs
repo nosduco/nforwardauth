@@ -109,6 +109,12 @@ async fn api_forward_auth(
 
     // Check if basic auth exists
     if headers.contains_key(AUTHORIZATION) {
+
+        // check ratelimiter ban
+        if let Some(resp) = check_rate_limit(&headers) {
+            return Ok(resp);
+        }
+        
         // Grab basic auth header and parse credentials
         let basic_auth = headers[AUTHORIZATION].to_str().unwrap();
         let credentials = Credentials::from_header(basic_auth.to_string()).unwrap();
@@ -125,7 +131,9 @@ async fn api_forward_auth(
         }
         
         // Incorrect login (via basic auth)
-
+// Failed attempt, send to ratelimiter
+        println!("Info: Failed Basic Auth login for:{}",&credentials.user_id);
+        record_failed_login(&headers);
     }
 
     // No valid cookie/jwt found, create redirect url and return
@@ -141,17 +149,17 @@ async fn api_forward_auth(
 // Set redirection URI for redirection on login
     if is_forwarded {
         let mut referral_url =
-            Url::parse(format!("http://{}", headers[FORWARDED_HOST].to_str().unwrap()).as_str())?;
-        // Set referral protocol based on X-Forwarded-Proto
-        if headers.contains_key(FORWARDED_PROTO) {
-            if let Err(_e) = referral_url.set_scheme(headers[FORWARDED_PROTO].to_str().unwrap()) {
+            Url::parse(&format!("http://{}",forwarded_host.unwrap()))?;
+        
+        if let Some(proto) = headers.get(FORWARDED_PROTO).and_then(|v| v.to_str().ok()) {
+            if let Err(_e) = referral_url.set_scheme(proto) {
                 println!("Error: Failed setting protocol for referral url.");
             }
         }
-        if headers.contains_key(FORWARDED_URI) {
-            referral_url.set_path(headers[FORWARDED_URI].to_str().unwrap());
+        if let Some(path) = headers.get(FORWARDED_URI).and_then(|v| v.to_str().ok()) {
+            referral_url.set_path(path);
         }
-        location.set_query(Some(format!("r={}", referral_url).as_str()));
+        location.set_query(Some(&format!("r={}", referral_url)));
     }
 
     let res_status_code = reject_status_code.unwrap_or(StatusCode::TEMPORARY_REDIRECT);
@@ -165,34 +173,14 @@ async fn api_forward_auth(
 // Login route
 async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // Get headers from request
-    let headers = req.headers();
+    let headers = req.headers().clone();
+
     // Middleware - rate limiter
-    if let Some(mut rate_limiter) = middleware::RateLimiter::global() {
-        // Rate limiter is enabled, grab IP from header and check rate limit
-        if headers.contains_key(FORWARDED_FOR) {
-            let x_forwarded_for = headers[FORWARDED_FOR].to_str().unwrap();
-            let source_ip = x_forwarded_for.split(',').next().unwrap_or(x_forwarded_for);
-            if let Ok(ip) = source_ip.trim().parse::<IpAddr>() {
-                if !rate_limiter.try_login(ip) {
-                    // Rate limit exceeded, return an error response
-                    return Ok(Response::builder()
-                        .status(StatusCode::TOO_MANY_REQUESTS)
-                        .body(full(TOO_MANY_REQUESTS))
-                        .unwrap());
-                }
-            } else {
-                println!(
-                    "Warning: Failed to parse {} header from request.",
-                    FORWARDED_FOR
-                );
-            }
-        } else {
-            println!(
-                "Warning: Request without {} header processed.",
-                FORWARDED_FOR
-            );
-        }
+    // check ratelimiter ban
+    if let Some(resp) = check_rate_limit(&headers) {
+        return Ok(resp);
     }
+    
     // Aggregate request body
     let body = req.collect().await?.aggregate();
     // Decode JSON
@@ -228,7 +216,11 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
             .unwrap());
     }
 
-    // Incorrect login, respond with unauthorized
+    // Incorrect login (via basic auth)
+    // Failed attempt, send to ratelimiter
+    println!("Info: Failed Form login for:{}",user);
+    record_failed_login(&headers);
+    // respond with unauthorized
     Ok(Response::builder()
         .status(StatusCode::UNAUTHORIZED)
         .body(full(UNAUTHORIZED))
@@ -321,6 +313,44 @@ fn is_safe_path(path: &str) -> bool {
     // All other paths must start with /public and not contain ..
     normalized.first() == Some(&"public") && !normalized.contains(&"..")
 }
+
+fn extract_client_ip(headers: &hyper::HeaderMap) -> Option<IpAddr> {
+    let ip = headers
+        .get(FORWARDED_FOR)
+        .and_then(|v| v.to_str().ok())
+        .map(|raw| raw.split(',').next().unwrap_or("").trim())
+        .and_then(|ip_str| ip_str.parse::<IpAddr>().ok());
+
+    if ip.is_none() {
+        println!("Warning: Could not extract IP from {}", FORWARDED_FOR);
+    }
+
+    ip
+}
+
+fn check_rate_limit(headers: &hyper::HeaderMap) -> Option<Response<BoxBody>> {
+    if let Some(mut limiter) = middleware::RateLimiter::global() {
+        if let Some(ip) = extract_client_ip(headers) {
+            if limiter.is_banned(ip) {
+                return Some(
+                    Response::builder()
+                        .status(StatusCode::TOO_MANY_REQUESTS)
+                        .body(full(TOO_MANY_REQUESTS))
+                        .unwrap(),
+                );
+            }
+        }
+    }
+    None
+}
+fn record_failed_login(headers: &hyper::HeaderMap) {
+    if let Some(mut rate_limiter) = middleware::RateLimiter::global() {
+        if let Some(ip) = extract_client_ip(headers) {
+            rate_limiter.record_failed_attempt(ip);
+        }
+    }
+}
+
 
 // Serve file route
 async fn api_serve_file(filename: &str, status_code: StatusCode) -> Result<Response<BoxBody>> {
