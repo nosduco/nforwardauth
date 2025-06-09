@@ -69,7 +69,7 @@ async fn api_forward_auth(
 ) -> Result<Response<BoxBody>> {
     // Get token from request headers and check if cookie exists
     let headers = req.headers();
-// check validity of FORWARDED_HOST
+    // check validity of FORWARDED_HOST
     let forwarded_host = headers
     .get(FORWARDED_HOST)
     .and_then(|v| v.to_str().ok());
@@ -159,7 +159,7 @@ async fn api_forward_auth(
             println!("Error: Failed setting protocol for redirect location.");
         }
     }
-// Set redirection URI for redirection on login
+    // Set redirection URI for redirection on login
     if is_forwarded {
         let mut referral_url =
             Url::parse(&format!("http://{}",forwarded_host.unwrap()))?;
