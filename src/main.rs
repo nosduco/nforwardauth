@@ -107,7 +107,7 @@ async fn api_forward_auth(
     if headers.contains_key(AUTHORIZATION) && is_forwarded {
 
         // check ratelimiter ban
-        if let Some(resp) = check_rate_limit(&headers) {
+        if let Some(resp) = check_rate_limit(headers) {
             return Ok(resp);
         }
         
@@ -134,7 +134,7 @@ async fn api_forward_auth(
         // Incorrect login (via basic auth)
         // Failed attempt, send to ratelimiter
         println!("Info: Failed Basic Auth login for:{}",&credentials.user_id);
-        record_failed_login(&headers);
+        record_failed_login(headers);
     }
 
     // No valid cookie/jwt found, create redirect url and return
