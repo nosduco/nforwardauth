@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/nosduco/nforwardauth/compare/v1.4.2...v1.5.0) (2025-06-13)
+
+
+### Features
+
+* X-Forwarded-User for downstream identification, rate-limiting for all failed login attempts ([ac52ca5](https://github.com/nosduco/nforwardauth/commit/ac52ca5da86608fa33271bf4d68afded2a257ac3))
+
+
+### Refactor
+
+* comment styling ([60c4208](https://github.com/nosduco/nforwardauth/commit/60c42087513e4873850a04d066e41d5fd84dca9b))
+
 ## [1.4.2](https://github.com/nosduco/nforwardauth/compare/v1.4.1...v1.4.2) (2025-01-23)
 
 
