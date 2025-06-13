@@ -27,6 +27,7 @@ services:
       # - RATE_LIMITER_MAX_RETRIES=3 # Max retries allowed within RATE_LIMITER_FIND_TIME
       # - RATE_LIMITER_FIND_TIME=120 # Time in seconds to keep track of login attempts
       # - RATE_LIMITER_BAN_TIME=300  # Time in seconds to ban clients after reaching RATE_LIMITER_MAX_RETRIES
+      # - PASS_USER_HEADER=false # Set Whether User is passed in header for downstream identification (default: true, disable to -disallow- username leakage)
       - AUTH_HOST=nforwardauth.localhost.com # (required)
       - PORT=3000
     labels:
