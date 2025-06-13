@@ -46,15 +46,15 @@ RUN npx html-minifier --collapse-whitespace --remove-comments --remove-original-
 FROM alpine:3.17
 
 # Copy binary from build stage
-COPY --from=builder /build/nforwardauth /nforwardauth
+COPY --from=builder /build/nforwardauth /opt/nforwardauth/nforwardauth
 
 # Copy files and assets to serve (overwritable via docker volume mount)
 COPY ./public /public
-COPY --from=minifier /build/style.css /public/style.css
-COPY --from=minifier /build/script.js /public/script.js
-COPY --from=minifier /build/logout.js /public/logout.js
-COPY --from=minifier /build/index.html /public/index.html
-COPY --from=minifier /build/logout.html /public/logout.html
+COPY --from=minifier /build/style.css /opt/nforwardauth/public/style.css
+COPY --from=minifier /build/script.js /opt/nforwardauth/public/script.js
+COPY --from=minifier /build/logout.js /opt/nforwardauth/public/logout.js
+COPY --from=minifier /build/index.html /opt/nforwardauth/public/index.html
+COPY --from=minifier /build/logout.html /opt/nforwardauth/public/logout.html
 
 # Set entrypoint for image
-ENTRYPOINT ["/nforwardauth"]
+ENTRYPOINT ["/opt/nforwardauth/nforwardauth"]
