@@ -24,26 +24,26 @@ use tokio::net::TcpListener;
 use tokio::signal::unix::{signal, SignalKind};
 use url::Url;
 
-/* Header Names */
+// Forward auth header names
 static FORWARDED_HOST: &str = "X-Forwarded-Host";
 static FORWARDED_PROTO: &str = "X-Forwarded-Proto";
 static FORWARDED_URI: &str = "X-Forwarded-Uri";
 static FORWARDED_FOR: &str = "X-Forwarded-For";
 static FORWARDED_USER: &str = "X-Forwarded-User";
 
-/* File Paths */
+// Static file paths
 static INDEX_DOCUMENT: &str = "/public/index.html";
 static LOGOUT_DOCUMENT: &str = "/public/logout.html";
 static PASSWD_FILE: &str = "/passwd";
 
-/* HTTP Status Responses */
+// HTTP response body content
 static NOT_FOUND: &[u8] = b"Not Found";
 static UNAUTHORIZED: &[u8] = b"Unauthorized";
 static AUTHORIZED: &[u8] = b"Authorized";
 static LOGGED_OUT: &[u8] = b"Logged Out";
 static TOO_MANY_REQUESTS: &[u8] = b"Too Many Requests";
 
-// Route table
+// Main router function that dispatches requests to the appropriate handler
 async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") | (&Method::GET, "/forward") => api_forward_auth(req, None).await,
@@ -62,78 +62,64 @@ async fn api(req: Request<hyper::body::Incoming>) -> Result<Response<BoxBody>> {
     }
 }
 
-// ForwardAuth route
+// Handle authentication forwarding for reverse proxies like Traefik or Nginx
 async fn api_forward_auth(
     req: Request<IncomingBody>,
     reject_status_code: Option<StatusCode>,
 ) -> Result<Response<BoxBody>> {
-    // Get token from request headers and check if cookie exists
     let headers = req.headers();
-    // check validity of FORWARDED_HOST
-    let forwarded_host = headers
-    .get(FORWARDED_HOST)
-    .and_then(|v| v.to_str().ok());
-    // check if traffic is forwarded
+    // Extract and validate the forwarded host header
+    let forwarded_host = headers.get(FORWARDED_HOST).and_then(|v| v.to_str().ok());
+    // Determine if this is a forwarded request from a proxy or direct access
     let is_forwarded = forwarded_host
-    .map(|host| host != Config::global().auth_host)
-    .unwrap_or(false);
+        .map(|host| host != Config::global().auth_host)
+        .unwrap_or(false);
 
     // Get token from request headers and check if cookie exists, otherwise serve login page
     let user = validate_cookie(headers);
-    // UNWRAP HERE // 
-    // Valid cookie found, redirect 
     if user.is_some() {
-        //Successful cookie pass
+        // User is authenticated via cookie
         let user = user.unwrap();
         if is_forwarded {
-            // simple AUTHORIZED response on forward
-            let mut response = Response::builder()
-                .status(StatusCode::OK);
+            // AUTHORIZED response on forward
+            let mut response = Response::builder().status(StatusCode::OK);
             // Pass X-Forwarded-User if configured
-            if Config::global().pass_user_header {response = response
-                .header(FORWARDED_USER, user);
+            if Config::global().pass_user_header {
+                response = response.header(FORWARDED_USER, user);
             }
-            return Ok(response
-                .body(full(AUTHORIZED))
-                .unwrap());
+            return Ok(response.body(full(AUTHORIZED)).unwrap());
         } else {
-            // offer logout-page to authorized users on direct entry through auth_host
+            // Offer logout-page to authorized users on direct entry through auth_host
             return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
         }
     }
 
-
     // Check if basic auth exists, only if cookie failed and for forwarded traffic
     if headers.contains_key(AUTHORIZATION) && is_forwarded {
-
-        // check ratelimiter ban
+        // Check ratelimiter ban
         if let Some(resp) = check_rate_limit(headers) {
             return Ok(resp);
         }
-        
+
         // Grab basic auth header and parse credentials
         let basic_auth = headers[AUTHORIZATION].to_str().unwrap();
         let credentials = Credentials::from_header(basic_auth.to_string()).unwrap();
 
-        let verify = authenticate_user(&credentials.user_id,&credentials.password,).await?;
+        let verify = authenticate_user(&credentials.user_id, &credentials.password).await?;
         let user = &credentials.user_id;
-        // basic auth only accepted for forwarded traffic, not for main login page
+        // Basic auth only accepted for forwarded traffic, not for main login page
         if verify {
-            //Successful basic auth pass: simple AUTHORIZED response on forward
-            let mut response = Response::builder()
-                .status(StatusCode::OK);
+            // Successful basic auth pass: simple AUTHORIZED response on forward
+            let mut response = Response::builder().status(StatusCode::OK);
             // Pass X-Forwarded-User if configured
-            if Config::global().pass_user_header {response = response
-                .header(FORWARDED_USER, user);
+            if Config::global().pass_user_header {
+                response = response.header(FORWARDED_USER, user);
             }
-            return Ok(response
-                .body(full(AUTHORIZED))
-                .unwrap());                    
+            return Ok(response.body(full(AUTHORIZED)).unwrap());
         }
-        
-        // Incorrect login (via basic auth)
-        // Failed attempt, send to ratelimiter
-        println!("Info: Failed Basic Auth login for:{}",&credentials.user_id);
+
+        // Authentication failed, record the attempt for rate limiting
+        println!("Info: Failed Basic Auth login for:{}", &credentials.user_id);
         record_failed_login(headers);
     }
 
@@ -149,9 +135,8 @@ async fn api_forward_auth(
     }
     // Set redirection URI for redirection on login
     if is_forwarded {
-        let mut referral_url =
-            Url::parse(&format!("http://{}",forwarded_host.unwrap()))?;
-        
+        let mut referral_url = Url::parse(&format!("http://{}", forwarded_host.unwrap()))?;
+
         if let Some(proto) = headers.get(FORWARDED_PROTO).and_then(|v| v.to_str().ok()) {
             if let Err(_e) = referral_url.set_scheme(proto) {
                 println!("Error: Failed setting protocol for referral url.");
@@ -171,26 +156,26 @@ async fn api_forward_auth(
         .unwrap())
 }
 
-// Login route
+// Process login form submissions and generate authentication cookies
 async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
-    // Get headers from request
+    // Clone headers for rate limiter checks
     let headers = req.headers().clone();
 
-    // Middleware - rate limiter
-    // check ratelimiter ban
+    // Check if client IP is rate limited
     if let Some(resp) = check_rate_limit(&headers) {
         return Ok(resp);
     }
-    
-    // Aggregate request body
+
+    // Collect and parse the JSON request body
     let body = req.collect().await?.aggregate();
-    // Decode JSON
     let data: serde_json::Value = serde_json::from_reader(body.reader())?;
-    // Process login and find user in passwd file
+
+    // Extract credentials from the request
     let user = data["username"].as_str().unwrap();
     let pass = data["password"].as_str().unwrap();
-    // check credentials against passwd
-    let verify = authenticate_user(user,pass).await?;
+
+    // Validate credentials against password file
+    let verify = authenticate_user(user, pass).await?;
     if verify {
         // Correct login, generate claims and token
         let mut claims = BTreeMap::new();
@@ -217,9 +202,8 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
             .unwrap());
     }
 
-    // Incorrect login (via basic auth)
-    // Failed attempt, send to ratelimiter
-    println!("Info: Failed Form login for:{}",user);
+    // Authentication failed, record the attempt for rate limiting
+    println!("Info: Failed Form login for:{}", user);
     record_failed_login(&headers);
     // respond with unauthorized
     Ok(Response::builder()
@@ -228,13 +212,13 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         .unwrap())
 }
 
-// Login serve file wrapper
+// Serve the login page or redirect authenticated users to their destination
 async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // Get token from request headers and check if cookie exists, otherwise serve login page
     let headers = req.headers();
     let user = validate_cookie(headers);
 
-    // Valid cookie found, redirect 
+    // Valid cookie found, redirect
     if user.is_some() {
         // Fetch the 'r' query parameter from the request
         let target_url = req
@@ -265,12 +249,12 @@ async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBod
     api_serve_file(INDEX_DOCUMENT, StatusCode::OK).await
 }
 
-// Logout serve file wrapper
+// Serve the logout page for authenticated users
 async fn api_logout_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // Get token from request headers and check if cookie exists, otherwise serve login page
     let headers = req.headers();
     let user = validate_cookie(headers);
-    
+
     // serve login page if not logged in
     if user.is_none() {
         return Ok(Response::builder()
@@ -284,7 +268,7 @@ async fn api_logout_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBo
     api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await
 }
 
-// Logout route
+// Process logout requests and invalidate authentication cookies
 async fn api_logout() -> Result<Response<BoxBody>> {
     // Build cookie in past to expire existing cookies in browser
     let past = OffsetDateTime::now_utc() - CookieDuration::days(1);
@@ -304,6 +288,7 @@ async fn api_logout() -> Result<Response<BoxBody>> {
         .unwrap())
 }
 
+// Validate file paths to prevent directory traversal attacks
 fn is_safe_path(path: &str) -> bool {
     // Normalize path by removing duplicate slashes
     let normalized = path
@@ -320,6 +305,7 @@ fn is_safe_path(path: &str) -> bool {
     normalized.first() == Some(&"public") && !normalized.contains(&"..")
 }
 
+// Extract client IP address from X-Forwarded-For header
 fn extract_client_ip(headers: &hyper::HeaderMap) -> Option<IpAddr> {
     let ip = headers
         .get(FORWARDED_FOR)
@@ -334,6 +320,7 @@ fn extract_client_ip(headers: &hyper::HeaderMap) -> Option<IpAddr> {
     ip
 }
 
+// Check if the client IP is rate limited and return a response if banned
 fn check_rate_limit(headers: &hyper::HeaderMap) -> Option<Response<BoxBody>> {
     if let Some(mut limiter) = middleware::RateLimiter::global() {
         if let Some(ip) = extract_client_ip(headers) {
@@ -350,6 +337,7 @@ fn check_rate_limit(headers: &hyper::HeaderMap) -> Option<Response<BoxBody>> {
     None
 }
 
+// Validate the authentication cookie and extract the username if valid
 fn validate_cookie(headers: &hyper::HeaderMap) -> Option<String> {
     if headers.contains_key(COOKIE) {
         // Grab cookies from headers
@@ -377,7 +365,7 @@ fn validate_cookie(headers: &hyper::HeaderMap) -> Option<String> {
     None
 }
 
-
+// Record failed login attempts for rate limiting
 fn record_failed_login(headers: &hyper::HeaderMap) {
     if let Some(mut rate_limiter) = middleware::RateLimiter::global() {
         if let Some(ip) = extract_client_ip(headers) {
@@ -386,7 +374,7 @@ fn record_failed_login(headers: &hyper::HeaderMap) {
     }
 }
 
-// Serve file route
+// Safely serve static files from the filesystem
 async fn api_serve_file(filename: &str, status_code: StatusCode) -> Result<Response<BoxBody>> {
     if !is_safe_path(filename) {
         return Ok(Response::builder()
@@ -412,14 +400,14 @@ async fn api_serve_file(filename: &str, status_code: StatusCode) -> Result<Respo
             .unwrap());
     }
 
-    // 404, not found
+    // Return 404 Not Found if file doesn't exist
     Ok(Response::builder()
         .status(StatusCode::NOT_FOUND)
         .body(full(NOT_FOUND))
         .unwrap())
 }
 
-// check full credentials agains passwd
+// Verify user credentials against the password file
 async fn authenticate_user(user: &str, password: &str) -> Result<bool> {
     if let Ok(passwd) = fs::read_to_string(PASSWD_FILE).await {
         for line in passwd.lines() {
@@ -435,11 +423,11 @@ async fn authenticate_user(user: &str, password: &str) -> Result<bool> {
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    // Initialize config (port, token secret, auth backend url, ...)
+    // Load application configuration
     Config::initialize()?;
     println!("Loaded configuration.");
 
-    // Initialize rate limiter (if enabled)
+    // Set up rate limiting if enabled in configuration
     if Config::global().rate_limiter_enabled {
         middleware::RateLimiter::initialize(
             Config::global().rate_limiter_max_retries,
@@ -448,28 +436,28 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    // Setup signal handling
+    // Configure graceful shutdown on SIGTERM and SIGINT signals
     let mut term_signal = signal(SignalKind::terminate())?;
     let mut int_signal = signal(SignalKind::interrupt())?;
 
-    // Create TcpListener and bind
+    // Bind to configured port on all interfaces
     let addr = SocketAddr::from(([0, 0, 0, 0], Config::global().port));
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on http://{}", addr);
 
-    // Create a future to handle server startup
+    // Define the main server loop
     let server = async {
-        // Start loop to continuously accept incoming connections
+        // Accept and process incoming connections
         loop {
             match listener.accept().await {
                 Ok((stream, _)) => {
                     let io = TokioIo::new(stream);
 
-                    // Spawn a tokio task to serve multiple connections concurrently
+                    // Handle each connection in a separate task for concurrency
                     tokio::task::spawn(async move {
-                        // Finally, bind the incoming connection to our index service
+                        // Process HTTP requests using our API router
                         if let Err(err) = http1::Builder::new()
-                            // Convert function to service
+                            // Convert our API function to a service
                             .serve_connection(io, service_fn(api))
                             .await
                         {
@@ -485,7 +473,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // Create a future to handle signals
+    // Define signal handling for graceful shutdown
     let shutdown_signal = async {
         tokio::select! {
             _ = term_signal.recv() => {},
@@ -493,7 +481,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // Run server with signal handling
+    // Start the server and wait for either completion or shutdown signal
     tokio::select! {
         _ = server => {},
         _ = shutdown_signal => {

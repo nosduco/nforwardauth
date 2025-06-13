@@ -63,7 +63,7 @@ impl RateLimiter {
 
         false
     }
-    
+
     pub fn record_failed_attempt(&mut self, ip: IpAddr) {
         let now = Instant::now();
         // initialize attempt (though should be there due to is_banned)
