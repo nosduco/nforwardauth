@@ -12,6 +12,7 @@ pub struct Config {
     pub cookie_secure: bool,
     pub cookie_domain: String,
     pub cookie_name: String,
+    pub pass_user_header: bool,
     pub rate_limiter_enabled: bool,
     pub rate_limiter_max_retries: u32,
     pub rate_limiter_find_time: u32,
@@ -81,6 +82,12 @@ impl Config {
             Err(..) => "nforwardauth".to_string(),
         };
 
+        // pass_user_header: Whether User is passed in header for downstream user identification
+        let pass_user_header: bool = match env::var("PASS_USER_HEADER") {
+            Ok(enabled) => enabled != "false",
+            Err(..) => true,
+        };
+
         // rate_limiter_enabled: Whether rate limiter for logins is enabled or not
         let rate_limiter_enabled: bool = match env::var("RATE_LIMITER_ENABLED") {
             Ok(enabled) => enabled != "false",
@@ -113,6 +120,7 @@ impl Config {
             cookie_secure,
             cookie_domain,
             cookie_name,
+            pass_user_header,
             rate_limiter_enabled,
             rate_limiter_max_retries,
             rate_limiter_find_time,

@@ -78,6 +78,7 @@ services:
     labels:
       - "traefik.http.routers.nforwardauth.rule=Host(`nforwardauth.yourdomain.com`)"
       - "traefik.http.middlewares.nforwardauth.forwardauth.address=http://nforwardauth:3000"
+      - "traefik.http.middlewares.nforwardauth.forwardauth.authResponseHeaders=X-Forwarded-User" #Pass 'X-Forwarded-User' header from response for downstream identification
       - "traefik.http.services.nforwardauth.loadbalancer.server.port=3000"
     volumes:
       - "/path/to/passwd:/passwd:ro" # Mount local passwd file at /passwd as read only
@@ -121,6 +122,7 @@ Look at the `examples` directory in the repository or the below details section 
         - AUTH_HOST=nforwardauth.localhost.com # (required)
         - COOKIE_DOMAIN=localhost.com # Set domain for the cookies. This value will allow cookie and auth on *.yourdomain.com (including base domain)
         - COOKIE_NAME=nforwardauth # Set name for the cookie (helpful if running multiple instances of nforwardauth to prevent collision)
+        - PASS_USER_HEADER=false # Set Whether User is passed in header for downstream identification (default: true, disable to -disallow- username leakage)
         - PORT=3000 # Set specific port to listen on 
       labels:
         - "traefik.http.routers.nforwardauth.rule=Host(`nforwardauth.localhost.com`)"
@@ -150,6 +152,7 @@ Look at the `examples` directory in the repository or the below details section 
 | `COOKIE_DOMAIN` | Set the domain for the cookies, allow auth on sites beyond the root domain | string | Inferred by base url of `AUTH_HOST` | `mydomain.com`
 | `COOKIE_NAME` | Set name for the cookies. Helpful if running multiple instances to prevent collision | string | `nforwardauth` | `auth-token-1`
 | `PORT` | Set port to litsen on | number | `3000` | `80`
+| `PASS_USER_HEADER` | Enable or disable passing of authenticated user in header `X-Forwarded-User` for downstream identification | boolean | `true` | `false`
 | `RATE_LIMITER_ENABLED` | Enable or disable the built-in rate limiter | boolean | `true` | `false`
 | `RATE_LIMITER_MAX_RETRIES` | Max retries allowed within `RATE_LIMITER_FIND_TIME` | integer | `3` | `5`
 | `RATE_LIMITER_FIND_TIME` | Time in seconds to keep track of login attempts | integer | `120` | `60`
