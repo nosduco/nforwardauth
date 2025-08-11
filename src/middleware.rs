@@ -41,9 +41,9 @@ impl RateLimiter {
             .expect("Failed to initialize rate limiter");
     }
 
-    pub fn try_login(&mut self, ip: IpAddr) -> bool {
+    pub fn is_banned(&mut self, ip: IpAddr) -> bool {
         let now = Instant::now();
-
+        //initialize attempt
         let attempt = self.attempts.entry(ip).or_insert(Attempt {
             retries: 0,
             first_attempt_time: now,
@@ -52,7 +52,7 @@ impl RateLimiter {
 
         if let Some(banned_until) = attempt.banned_until {
             if now < banned_until {
-                return false;
+                return true;
             } else {
                 // Unban if the ban time has elapsed
                 attempt.banned_until = None;
@@ -60,6 +60,18 @@ impl RateLimiter {
                 attempt.first_attempt_time = now;
             }
         }
+
+        false
+    }
+
+    pub fn record_failed_attempt(&mut self, ip: IpAddr) {
+        let now = Instant::now();
+        // initialize attempt (though should be there due to is_banned)
+        let attempt = self.attempts.entry(ip).or_insert(Attempt {
+            retries: 0,
+            first_attempt_time: now,
+            banned_until: None,
+        });
 
         if now.duration_since(attempt.first_attempt_time) > self.find_time {
             // Reset the counter and time if outside the find_time window
@@ -70,12 +82,7 @@ impl RateLimiter {
         attempt.retries += 1;
 
         if attempt.retries > self.max_retries {
-            // Ban for ban_time duration
             attempt.banned_until = Some(now + self.ban_time);
-            return false;
         }
-
-        // Not rate limited, return true
-        true
     }
 }
