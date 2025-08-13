@@ -33,10 +33,10 @@ nforwardauth uses a `passwd` file to store valid credentials. Currently, it only
 
 nforwardauth uses a `passwd` file to store usernames and hashed passwords for authentication. To use nforwardauth, you'll need to create a `passwd` file and mount it as a volume when you run the container.
 
-Here's an example of how to create an initial `passwd` file with a single user named `test` and the password `test`. We'll use the `mkpasswd` command to generate a sha-512 hashed version of the password and echo the username and hashed password into the `passwd` file.
+Here's an example of how to create an initial `passwd` file with a single user named `test` and the password `test`. We'll use the `openssl` command to generate a sha-512 hashed version of the password and echo the username and hashed password into the `passwd` file.
 
 ```bash
-echo "test:$(mkpasswd -m sha-512 test)" >> /path/to/passwd
+echo "test:$(openssl passwd -6 test)" >> /path/to/passwd
 
 ```
 
