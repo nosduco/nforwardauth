@@ -411,7 +411,7 @@ async fn api_serve_file(filename: &str, status_code: StatusCode) -> Result<Respo
 async fn authenticate_user(user: &str, password: &str) -> Result<bool> {
     if let Ok(passwd) = fs::read_to_string(PASSWD_FILE).await {
         for line in passwd.lines() {
-            if let Some((stored_user, stored_hash)) = line.split_once(":") {
+            if let Some((stored_user, stored_hash)) = line.split_once(':') {
                 if stored_user == user && pwhash::unix::verify(password, stored_hash) {
                     return Ok(true);
                 }
