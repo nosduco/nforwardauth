@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/nosduco/nforwardauth/compare/v1.5.0...v1.5.1) (2025-09-29)
+
+
+### Bug Fixes
+
+* cippy issues ([d5fc249](https://github.com/nosduco/nforwardauth/commit/d5fc2497a46d806bffd79b3fe97b827ee21a680c))
+
 ## [1.5.0](https://github.com/nosduco/nforwardauth/compare/v1.4.2...v1.5.0) (2025-06-13)
 
 
