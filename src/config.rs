@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use hmac::{Hmac, Mac};
 use once_cell::sync::OnceCell;
 use regex::Regex;
@@ -17,6 +18,8 @@ pub struct Config {
     pub rate_limiter_max_retries: u32,
     pub rate_limiter_find_time: u32,
     pub rate_limiter_ban_time: u32,
+    pub passwd_file: String,
+	pub disabled_users: HashSet<String>,
 }
 
 /* Config Singleton Instance and Implementation */
@@ -111,6 +114,20 @@ impl Config {
             Ok(ban_time) => ban_time.parse::<u32>().unwrap(),
             Err(..) => 300,
         };
+		
+        // passwd_file: The passwd file location to read for auth requests
+        let passwd_file: String = match env::var("PASSWD_FILE") {
+            Ok(value) => value,
+            Err(..) => "/passwd".to_string(),
+        };
+		
+        // disabled_users: Deny access for specific users, env variable delimeted by `,`
+		let disabled_users: HashSet<String> = env::var("DISABLED_USERS")
+		.unwrap_or_default()
+		.split(',')
+		.filter(|s| !s.is_empty())
+		.map(|s| s.to_string())
+		.collect();
 
         // Create config instance with initialized values
         let config = Config {
@@ -125,6 +142,8 @@ impl Config {
             rate_limiter_max_retries,
             rate_limiter_find_time,
             rate_limiter_ban_time,
+            passwd_file,
+			disabled_users,
         };
 
         // Initialize config in instance
