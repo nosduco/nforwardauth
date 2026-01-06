@@ -75,10 +75,8 @@ async fn api_forward_auth(
         .unwrap_or(false);
 
     // Get token from request headers and check if cookie exists, otherwise serve login page
-    let user = validate_cookie(headers);
-    if user.is_some() {
+    if let Some(user) = validate_cookie(headers) {
         // User is authenticated via cookie
-        let user = user.unwrap();
         if is_forwarded {
             // AUTHORIZED response on forward
             let mut response = Response::builder().status(StatusCode::OK);
@@ -408,17 +406,17 @@ async fn api_serve_file(filename: &str, status_code: StatusCode) -> Result<Respo
 
 // Verify user credentials against the password file
 async fn authenticate_user(user: &str, password: &str) -> Result<bool> {
-	if Config::global().disabled_users.contains(user) {
-		return Ok(false);
+    if Config::global().disabled_users.contains(user) {
+        return Ok(false);
     }
     if let Ok(passwd) = fs::read_to_string(&Config::global().passwd_file).await {
         for line in passwd.lines() {
             if let Some((stored_user, stored_hash_rest)) = line.split_once(':') {
                 if stored_user == user {
-					let stored_hash = stored_hash_rest.split(':').next().unwrap();
-					if pwhash::unix::verify(password, stored_hash) {
-						return Ok(true);
-					}
+                    let stored_hash = stored_hash_rest.split(':').next().unwrap();
+                    if pwhash::unix::verify(password, stored_hash) {
+                        return Ok(true);
+                    }
                 }
             }
         }
