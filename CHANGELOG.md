@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.1](https://github.com/nosduco/nforwardauth/compare/v1.5.0...v1.5.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* cippy issues ([d5fc249](https://github.com/nosduco/nforwardauth/commit/d5fc2497a46d806bffd79b3fe97b827ee21a680c))
+* CVE-601 vulnerabiilty. scope redirect uris to cookie domain ([#71](https://github.com/nosduco/nforwardauth/issues/71)) ([664f260](https://github.com/nosduco/nforwardauth/commit/664f2602f9e1459558d1c4c55019f6d48bc64c43))
+* **deps:** bump actions/cache from 4 to 5 ([#66](https://github.com/nosduco/nforwardauth/issues/66)) ([266dce5](https://github.com/nosduco/nforwardauth/commit/266dce57ed67336f570725e53f59db590d795fc2))
+* **deps:** bump actions/checkout from 2 to 7 ([#62](https://github.com/nosduco/nforwardauth/issues/62)) ([cce0015](https://github.com/nosduco/nforwardauth/commit/cce0015a2d8f08280d7d32c499f9341a6426e2ab))
+* **deps:** bump docker/build-push-action from 6 to 7 ([#70](https://github.com/nosduco/nforwardauth/issues/70)) ([b8849e7](https://github.com/nosduco/nforwardauth/commit/b8849e7ad6e9866eedcd8ec6f70b618b67395c7d))
+* **deps:** bump docker/login-action from 3 to 4 ([#68](https://github.com/nosduco/nforwardauth/issues/68)) ([a69ffd2](https://github.com/nosduco/nforwardauth/commit/a69ffd248c4b32981deda9d157be412b5e8d3df4))
+* **deps:** bump docker/setup-qemu-action from 3 to 4 ([#69](https://github.com/nosduco/nforwardauth/issues/69)) ([f860e05](https://github.com/nosduco/nforwardauth/commit/f860e0533c37ee811a873c3cb8af0caa047c53d3))
+
 ## [1.5.0](https://github.com/nosduco/nforwardauth/compare/v1.4.2...v1.5.0) (2025-06-13)
 
 
