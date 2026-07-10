@@ -76,10 +76,8 @@ async fn api_forward_auth(
         .unwrap_or(false);
 
     // Get token from request headers and check if cookie exists, otherwise serve login page
-    let user = validate_cookie(headers);
-    if user.is_some() {
+    if let Some(user) = validate_cookie(headers) {
         // User is authenticated via cookie
-        let user = user.unwrap();
         if is_forwarded {
             // AUTHORIZED response on forward
             let mut response = Response::builder().status(StatusCode::OK);
@@ -119,13 +117,12 @@ async fn api_forward_auth(
         }
 
         // Authentication failed, record the attempt for rate limiting
-        println!("Info: Failed Basic Auth login for:{}", &credentials.user_id);
+        println!("Info: Failed Basic Auth login for:{}", credentials.user_id);
         record_failed_login(headers);
     }
 
     // No valid cookie/jwt found, create redirect url and return
-    let mut location =
-        Url::parse(format!("http://{}/login", &Config::global().auth_host).as_str())?;
+    let mut location = Url::parse(format!("http://{}/login", Config::global().auth_host).as_str())?;
 
     // Set redirection location protocol based on X-Forwarded-Proto
     if headers.contains_key(FORWARDED_PROTO) {
@@ -212,6 +209,38 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         .unwrap())
 }
 
+// host == cookie_domain or a subdomain. Dot boundary blocks "evilyourdomain.com".
+fn host_matches_domain(host: &str, cookie_domain: &str) -> bool {
+    let host = host.to_lowercase();
+    let domain = cookie_domain.trim_start_matches('.').to_lowercase();
+    if domain.is_empty() {
+        return false;
+    }
+    host == domain || host.ends_with(&format!(".{}", domain))
+}
+
+// Same-site redirect allowlist (open redirect / CWE-601). Some only for an
+// http(s) URL whose host is the cookie domain or a subdomain.
+fn validate_redirect_target(raw: &str, cookie_domain: &str) -> Option<String> {
+    let url = Url::parse(raw).ok()?;
+    // http(s) only; blocks javascript:, data:, //host
+    match url.scheme() {
+        "http" | "https" => {}
+        _ => return None,
+    }
+    let host = url.host_str()?;
+    if host_matches_domain(host, cookie_domain) {
+        Some(raw.to_string())
+    } else {
+        None
+    }
+}
+
+// Wrapper using the configured cookie domain.
+fn safe_redirect_target(raw: &str) -> Option<String> {
+    validate_redirect_target(raw, &Config::global().cookie_domain)
+}
+
 // Serve the login page or redirect authenticated users to their destination
 async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // Get token from request headers and check if cookie exists, otherwise serve login page
@@ -232,17 +261,22 @@ async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBod
             })
             .map(|s| s.to_string());
 
-        if let Some(target_url) = target_url {
-            // Target URL exists, redirect, no X-Forwarded-User header needed, as forwarded request is coming -after- redirect
+        // Validated same-site target only (CWE-601); else fall through to logout page.
+        if let Some(safe_url) = target_url.as_deref().and_then(safe_redirect_target) {
+            // Safe target: redirect. No X-Forwarded-User (forwarded request comes after).
             return Ok(Response::builder()
                 .status(StatusCode::TEMPORARY_REDIRECT)
-                .header(LOCATION, target_url)
+                .header(LOCATION, safe_url)
                 .body(full(AUTHORIZED))
                 .unwrap());
-        } else {
-            // Logged in, serve logout page if no redirect param found
-            return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
         }
+
+        if target_url.is_some() {
+            println!("Warning: Rejected foreign post-login redirect target");
+        }
+
+        // Logged in with no valid redirect target, serve logout page
+        return api_serve_file(LOGOUT_DOCUMENT, StatusCode::OK).await;
     }
 
     // Serve login page if not logged in
@@ -489,4 +523,82 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         },
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{host_matches_domain, validate_redirect_target};
+
+    #[test]
+    fn rejects_foreign_absolute_url() {
+        // reported payload
+        assert_eq!(
+            validate_redirect_target("https://evil.example/phish", "localhost"),
+            None
+        );
+    }
+
+    #[test]
+    fn allows_same_domain_and_subdomains() {
+        assert_eq!(
+            validate_redirect_target("https://yourdomain.com/", "yourdomain.com"),
+            Some("https://yourdomain.com/".to_string())
+        );
+        assert_eq!(
+            validate_redirect_target("https://whoami.yourdomain.com/x?a=1", "yourdomain.com"),
+            Some("https://whoami.yourdomain.com/x?a=1".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_suffix_lookalike_domain() {
+        // dot boundary: no suffix match
+        assert_eq!(
+            validate_redirect_target("https://evilyourdomain.com/", "yourdomain.com"),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_non_http_schemes() {
+        assert_eq!(
+            validate_redirect_target("javascript:alert(1)", "yourdomain.com"),
+            None
+        );
+        assert_eq!(
+            validate_redirect_target("data:text/html,<h1>x</h1>", "yourdomain.com"),
+            None
+        );
+        assert_eq!(
+            validate_redirect_target("ftp://yourdomain.com/x", "yourdomain.com"),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_scheme_relative_and_relative() {
+        // //host and bare paths are not absolute http(s)
+        assert_eq!(
+            validate_redirect_target("//evil.com", "yourdomain.com"),
+            None
+        );
+        assert_eq!(
+            validate_redirect_target("/some/path", "yourdomain.com"),
+            None
+        );
+    }
+
+    #[test]
+    fn host_match_is_case_insensitive_and_ignores_port() {
+        assert_eq!(
+            validate_redirect_target("https://WhoAmI.YourDomain.com:8443/x", "yourdomain.com"),
+            Some("https://WhoAmI.YourDomain.com:8443/x".to_string())
+        );
+        assert!(host_matches_domain("APP.Example.COM", ".example.com"));
+    }
+
+    #[test]
+    fn empty_domain_rejects_everything() {
+        assert!(!host_matches_domain("anything.com", ""));
+    }
 }

@@ -24,9 +24,9 @@ const handleError = () => {
 const handleResponse = (res) => {
   switch (res.status) {
     case 200:
-      // Authenticated, redirect to referral (if exists)
+      // Re-GET current page so the server validates r (open redirect / CWE-601).
       if (params.r) {
-        window.location.replace(params.r);
+        window.location.replace(window.location.pathname + window.location.search);
       } else {
         // Redirect to logout page
         window.location.replace("/logout?success=true");
