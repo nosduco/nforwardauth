@@ -117,13 +117,12 @@ async fn api_forward_auth(
         }
 
         // Authentication failed, record the attempt for rate limiting
-        println!("Info: Failed Basic Auth login for:{}", &credentials.user_id);
+        println!("Info: Failed Basic Auth login for:{}", credentials.user_id);
         record_failed_login(headers);
     }
 
     // No valid cookie/jwt found, create redirect url and return
-    let mut location =
-        Url::parse(format!("http://{}/login", &Config::global().auth_host).as_str())?;
+    let mut location = Url::parse(format!("http://{}/login", Config::global().auth_host).as_str())?;
 
     // Set redirection location protocol based on X-Forwarded-Proto
     if headers.contains_key(FORWARDED_PROTO) {
