@@ -212,8 +212,7 @@ async fn api_login(req: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         .unwrap())
 }
 
-// Check whether `host` equals `cookie_domain` or is a subdomain of it. The dot
-// boundary prevents "evilyourdomain.com" from matching "yourdomain.com".
+// host == cookie_domain or a subdomain. Dot boundary blocks "evilyourdomain.com".
 fn host_matches_domain(host: &str, cookie_domain: &str) -> bool {
     let host = host.to_lowercase();
     let domain = cookie_domain.trim_start_matches('.').to_lowercase();
@@ -223,13 +222,11 @@ fn host_matches_domain(host: &str, cookie_domain: &str) -> bool {
     host == domain || host.ends_with(&format!(".{}", domain))
 }
 
-// Validate that a post-login redirect target is same-site to prevent open
-// redirects (CWE-601). Returns the target only if it is an http(s) URL whose
-// host is the cookie domain or a subdomain of it; otherwise None so the caller
-// can fall back to a safe default.
+// Same-site redirect allowlist (open redirect / CWE-601). Some only for an
+// http(s) URL whose host is the cookie domain or a subdomain.
 fn validate_redirect_target(raw: &str, cookie_domain: &str) -> Option<String> {
     let url = Url::parse(raw).ok()?;
-    // Only allow http/https (blocks javascript:, data:, and scheme-relative //host)
+    // http(s) only; blocks javascript:, data:, //host
     match url.scheme() {
         "http" | "https" => {}
         _ => return None,
@@ -242,7 +239,7 @@ fn validate_redirect_target(raw: &str, cookie_domain: &str) -> Option<String> {
     }
 }
 
-// Convenience wrapper using the globally configured cookie domain.
+// Wrapper using the configured cookie domain.
 fn safe_redirect_target(raw: &str) -> Option<String> {
     validate_redirect_target(raw, &Config::global().cookie_domain)
 }
@@ -267,12 +264,9 @@ async fn api_login_wrapper(req: Request<IncomingBody>) -> Result<Response<BoxBod
             })
             .map(|s| s.to_string());
 
-        // Only redirect to a validated same-site target to prevent open
-        // redirects (CWE-601). Foreign/malformed targets fall back to the
-        // logout page below rather than bouncing the user off-site.
+        // Validated same-site target only (CWE-601); else fall through to logout page.
         if let Some(safe_url) = target_url.as_deref().and_then(safe_redirect_target) {
-            // Target URL exists and is same-site, redirect. No X-Forwarded-User
-            // header needed, as forwarded request is coming -after- redirect
+            // Safe target: redirect. No X-Forwarded-User (forwarded request comes after).
             return Ok(Response::builder()
                 .status(StatusCode::TEMPORARY_REDIRECT)
                 .header(LOCATION, safe_url)
@@ -540,7 +534,7 @@ mod tests {
 
     #[test]
     fn rejects_foreign_absolute_url() {
-        // Kasper Hong's reported payload: r pointing at an attacker host
+        // reported payload
         assert_eq!(
             validate_redirect_target("https://evil.example/phish", "localhost"),
             None
@@ -561,7 +555,7 @@ mod tests {
 
     #[test]
     fn rejects_suffix_lookalike_domain() {
-        // "evilyourdomain.com" must NOT match "yourdomain.com" (dot boundary)
+        // dot boundary: no suffix match
         assert_eq!(
             validate_redirect_target("https://evilyourdomain.com/", "yourdomain.com"),
             None
@@ -586,7 +580,7 @@ mod tests {
 
     #[test]
     fn rejects_scheme_relative_and_relative() {
-        // Protocol-relative //evil.com and bare paths are not absolute http(s) URLs
+        // //host and bare paths are not absolute http(s)
         assert_eq!(validate_redirect_target("//evil.com", "yourdomain.com"), None);
         assert_eq!(validate_redirect_target("/some/path", "yourdomain.com"), None);
     }
