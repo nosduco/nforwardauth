@@ -76,10 +76,8 @@ async fn api_forward_auth(
         .unwrap_or(false);
 
     // Get token from request headers and check if cookie exists, otherwise serve login page
-    let user = validate_cookie(headers);
-    if user.is_some() {
+    if let Some(user) = validate_cookie(headers) {
         // User is authenticated via cookie
-        let user = user.unwrap();
         if is_forwarded {
             // AUTHORIZED response on forward
             let mut response = Response::builder().status(StatusCode::OK);
@@ -581,8 +579,14 @@ mod tests {
     #[test]
     fn rejects_scheme_relative_and_relative() {
         // //host and bare paths are not absolute http(s)
-        assert_eq!(validate_redirect_target("//evil.com", "yourdomain.com"), None);
-        assert_eq!(validate_redirect_target("/some/path", "yourdomain.com"), None);
+        assert_eq!(
+            validate_redirect_target("//evil.com", "yourdomain.com"),
+            None
+        );
+        assert_eq!(
+            validate_redirect_target("/some/path", "yourdomain.com"),
+            None
+        );
     }
 
     #[test]
