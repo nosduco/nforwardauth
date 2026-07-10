@@ -24,9 +24,12 @@ const handleError = () => {
 const handleResponse = (res) => {
   switch (res.status) {
     case 200:
-      // Authenticated, redirect to referral (if exists)
+      // Authenticated. Re-request the current page as a GET so the SERVER
+      // validates the redirect target (open redirect / CWE-601). The server
+      // allowlists r against COOKIE_DOMAIN and falls back to the logout page
+      // for foreign targets, so the client never trusts r directly.
       if (params.r) {
-        window.location.replace(params.r);
+        window.location.replace(window.location.pathname + window.location.search);
       } else {
         // Redirect to logout page
         window.location.replace("/logout?success=true");
