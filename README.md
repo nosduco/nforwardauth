@@ -157,6 +157,8 @@ Look at the `examples` directory in the repository or the below details section 
 | `RATE_LIMITER_MAX_RETRIES` | Max retries allowed within `RATE_LIMITER_FIND_TIME` | integer | `3` | `5`
 | `RATE_LIMITER_FIND_TIME` | Time in seconds to keep track of login attempts | integer | `120` | `60`
 | `RATE_LIMITER_BAN_TIME` | Time in seconds to ban clients after reaching `RATE_LIMITER_MAX_RETRIES` | integer | `300` | `600`
+| `PASSWD_FILE` | The passwd file location to read for auth requests | string | `/passwd` | `/mnt/nforwardauth_passwd`
+| `DISABLED_USERS` | Deny access for specific users, env variable delimeted by `,` | string | - | `user1,user2`
 
 ## Roadmap
 

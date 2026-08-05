@@ -34,7 +34,6 @@ static FORWARDED_USER: &str = "X-Forwarded-User";
 // Static file paths
 static INDEX_DOCUMENT: &str = "/public/index.html";
 static LOGOUT_DOCUMENT: &str = "/public/logout.html";
-static PASSWD_FILE: &str = "/passwd";
 
 // HTTP response body content
 static NOT_FOUND: &[u8] = b"Not Found";
@@ -443,11 +442,17 @@ async fn api_serve_file(filename: &str, status_code: StatusCode) -> Result<Respo
 
 // Verify user credentials against the password file
 async fn authenticate_user(user: &str, password: &str) -> Result<bool> {
-    if let Ok(passwd) = fs::read_to_string(PASSWD_FILE).await {
+    if Config::global().disabled_users.contains(user) {
+        return Ok(false);
+    }
+    if let Ok(passwd) = fs::read_to_string(&Config::global().passwd_file).await {
         for line in passwd.lines() {
-            if let Some((stored_user, stored_hash)) = line.split_once(':') {
-                if stored_user == user && pwhash::unix::verify(password, stored_hash) {
-                    return Ok(true);
+            if let Some((stored_user, stored_hash_rest)) = line.split_once(':') {
+                if stored_user == user {
+                    let stored_hash = stored_hash_rest.split(':').next().unwrap();
+                    if pwhash::unix::verify(password, stored_hash) {
+                        return Ok(true);
+                    }
                 }
             }
         }
